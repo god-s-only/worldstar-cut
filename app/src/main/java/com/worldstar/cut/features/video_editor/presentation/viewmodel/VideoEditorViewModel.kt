@@ -29,7 +29,7 @@ import androidx.media3.exoplayer.ExoPlayer
 @HiltViewModel
 class VideoEditorViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    application: Application,
+    private val application: Application,
     private val getProjectByIdUseCase: GetProjectByIdUseCase,
     private val createProjectUseCase: CreateProjectUseCase,
     private val updateProjectUseCase: UpdateProjectUseCase,
