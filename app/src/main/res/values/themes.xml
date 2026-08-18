@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Splash screen theme (used by SplashScreen API) -->
+    <style name="Theme.WorldstarCut.SplashScreen" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#0D0D0D</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenIconBackgroundColor">#7B2FBE</item>
+        <item name="postSplashScreenTheme">@style/Theme.WorldstarCut</item>
+    </style>
+
+    <!-- Main app theme -->
+    <style name="Theme.WorldstarCut" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">#0D0D0D</item>
+        <item name="android:navigationBarColor">#0D0D0D</item>
+        <item name="android:windowBackground">#0D0D0D</item>
+    </style>
+
+</resources>

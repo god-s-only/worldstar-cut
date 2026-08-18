@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Play triangle (centered) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M42,32 L76,54 L42,76 Z" />
+
+    <!-- Film strip top -->
+    <path
+        android:fillColor="#7B2FBE"
+        android:pathData="M24,28 h60 v4 h-60 z" />
+
+    <!-- Film strip bottom -->
+    <path
+        android:fillColor="#7B2FBE"
+        android:pathData="M24,76 h60 v4 h-60 z" />
+
+    <!-- Film strip holes top -->
+    <path
+        android:fillColor="#0D0D0D"
+        android:pathData="M30,28 h4 v4 h-4 z" />
+    <path
+        android:fillColor="#0D0D0D"
+        android:pathData="M42,28 h4 v4 h-4 z" />
+    <path
+        android:fillColor="#0D0D0D"
+        android:pathData="M54,28 h4 v4 h-4 z" />
+    <path
+        android:fillColor="#0D0D0D"
+        android:pathData="M66,28 h4 v4 h-4 z" />
+
+    <!-- Film strip holes bottom -->
+    <path
+        android:fillColor="#0D0D0D"
+        android:pathData="M30,76 h4 v4 h-4 z" />
+    <path
+        android:fillColor="#0D0D0D"
+        android:pathData="M42,76 h4 v4 h-4 z" />
+    <path
+        android:fillColor="#0D0D0D"
+        android:pathData="M54,76 h4 v4 h-4 z" />
+    <path
+        android:fillColor="#0D0D0D"
+        android:pathData="M66,76 h4 v4 h-4 z" />
+
+</vector>
