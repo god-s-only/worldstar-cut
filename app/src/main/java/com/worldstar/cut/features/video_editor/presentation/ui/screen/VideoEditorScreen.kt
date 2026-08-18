@@ -1,6 +1,5 @@
 package com.worldstar.cut.features.video_editor.presentation.ui.screen
 
-import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,8 +28,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
 import com.worldstar.cut.core.ui.theme.*
 import com.worldstar.cut.features.video_editor.domain.model.Clip
 import com.worldstar.cut.features.video_editor.presentation.viewmodel.EditorTool
@@ -51,6 +56,20 @@ fun VideoEditorScreen(
     viewModel: VideoEditorViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Pause player when leaving the screen
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE) {
+                viewModel.player.pause()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -82,13 +101,13 @@ fun VideoEditorScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Video Preview
+            // Video Preview with real PlayerView
             VideoPreview(
+                player = viewModel.player,
                 uri = uiState.videoClips.firstOrNull()?.mediaUri,
                 isPlaying = uiState.isPlaying,
                 progress = uiState.playbackProgress,
                 onPlayPause = viewModel::onPlayPause,
-                onSeek = viewModel::onSeekTo,
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f)
@@ -178,57 +197,74 @@ private fun EditorTopBar(
 
 @Composable
 private fun VideoPreview(
+    player: ExoPlayer,
     uri: String?,
     isPlaying: Boolean,
     progress: Float,
     onPlayPause: () -> Unit,
-    onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+
     Box(
         modifier = modifier
             .background(Color.Black)
             .clickable(onClick = onPlayPause),
         contentAlignment = Alignment.Center
     ) {
-        // Placeholder for actual ExoPlayer PlayerView
-        // In production, this would be an AndroidView wrapping PlayerView
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xFF1A1A2E),
-                            Color(0xFF16213E)
+        if (uri != null) {
+            // Real ExoPlayer PlayerView
+            AndroidView(
+                factory = {
+                    PlayerView(context).apply {
+                        this.player = player
+                        useController = false
+                        setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
+                    }
+                },
+                update = { playerView ->
+                    playerView.player = player
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Play/Pause overlay (fades in/out)
+            AnimatedVisibility(
+                visible = !isPlaying,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.align(Alignment.Center)
+            ) {
+                Surface(
+                    modifier = Modifier.size(56.dp),
+                    shape = CircleShape,
+                    color = Color.Black.copy(alpha = 0.5f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Filled.PlayArrow,
+                            contentDescription = "Play",
+                            tint = Color.White,
+                            modifier = Modifier.size(32.dp)
                         )
-                    )
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            if (uri != null) {
-                // Show play icon overlay
-                Icon(
-                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = "Play/Pause",
-                    tint = Color.White.copy(alpha = 0.7f),
-                    modifier = Modifier.size(64.dp)
-                )
-            } else {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Outlined.Videocam,
-                        contentDescription = null,
-                        tint = TextDisabledDark,
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = "No media loaded",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextDisabledDark
-                    )
+                    }
                 }
+            }
+        } else {
+            // No media loaded state
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = Icons.Outlined.Videocam,
+                    contentDescription = null,
+                    tint = TextDisabledDark,
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "No media loaded",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextDisabledDark
+                )
             }
         }
 
@@ -368,7 +404,6 @@ private fun TrimTool(
         Text("Trim", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
         Spacer(Modifier.height(12.dp))
 
-        // Trim slider placeholder
         var trimStart by remember(clip) { mutableFloatStateOf((clip?.trimStartMs ?: 0L).toFloat() / 1000f) }
         var trimEnd by remember(clip) { mutableFloatStateOf((clip?.trimEndMs ?: 0L).toFloat() / 1000f) }
 
@@ -718,7 +753,7 @@ private fun Timeline(
             // Playhead
             if (totalDurationMs > 0) {
                 val playheadX = (playbackPositionMs.toFloat() / totalDurationMs) *
-                        (200f * zoomLevel) // approximate width in dp
+                        (200f * zoomLevel)
                 Box(
                     modifier = Modifier
                         .offset(x = playheadX.dp)

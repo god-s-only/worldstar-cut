@@ -1,16 +1,17 @@
 package com.worldstar.cut.features.video_editor.presentation.viewmodel
 
+import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.worldstar.cut.core.domain.result.Failure
 import com.worldstar.cut.core.domain.result.Result
 import com.worldstar.cut.features.video_editor.domain.model.Clip
 import com.worldstar.cut.features.video_editor.domain.model.Track
 import com.worldstar.cut.features.video_editor.domain.usecase.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -20,10 +21,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
 
 @HiltViewModel
 class VideoEditorViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
+    application: Application,
     private val getProjectByIdUseCase: GetProjectByIdUseCase,
     private val createProjectUseCase: CreateProjectUseCase,
     private val updateProjectUseCase: UpdateProjectUseCase,
@@ -45,8 +51,36 @@ class VideoEditorViewModel @Inject constructor(
     val events: SharedFlow<VideoEditorEvent> = _events.asSharedFlow()
 
     private var tracksJob: Job? = null
+    private var positionPollingJob: Job? = null
+
+    val player: ExoPlayer = ExoPlayer.Builder(application).build()
 
     init {
+        player.addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                when (playbackState) {
+                    Player.STATE_READY -> {
+                        val dur = player.duration.coerceAtLeast(0L)
+                        _uiState.update { it.copy(totalDurationMs = dur, isPlaying = player.isPlaying) }
+                    }
+                    Player.STATE_ENDED -> {
+                        _uiState.update { it.copy(isPlaying = false, playbackPositionMs = 0L) }
+                    }
+                    Player.STATE_IDLE -> {}
+                    Player.STATE_BUFFERING -> {}
+                }
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                _uiState.update { it.copy(isPlaying = isPlaying) }
+                if (isPlaying) startPositionPolling() else stopPositionPolling()
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                _uiState.update { it.copy(errorMessage = "Playback error: ${error.message}") }
+            }
+        })
+
         if (projectId > 0) {
             loadProject(projectId)
         } else if (selectedMediaUri != null) {
@@ -59,10 +93,15 @@ class VideoEditorViewModel @Inject constructor(
     // ─── Playback ─────────────────────────────────────────────────────────────
 
     fun onPlayPause() {
-        _uiState.update { it.copy(isPlaying = !it.isPlaying) }
+        if (player.isPlaying) {
+            player.pause()
+        } else {
+            player.play()
+        }
     }
 
     fun onSeekTo(positionMs: Long) {
+        player.seekTo(positionMs)
         _uiState.update { it.copy(playbackPositionMs = positionMs) }
     }
 
@@ -101,6 +140,7 @@ class VideoEditorViewModel @Inject constructor(
         val clip = _uiState.value.selectedClip ?: return
         viewModelScope.launch {
             updateClipUseCase(clip.copy(volume = volume))
+            player.volume = volume
         }
     }
 
@@ -108,6 +148,8 @@ class VideoEditorViewModel @Inject constructor(
         val clip = _uiState.value.selectedClip ?: return
         viewModelScope.launch {
             updateClipUseCase(clip.copy(speed = speed))
+            val params = player.playbackParameters
+            player.playbackParameters = params.copyWithSpeed(speed)
         }
     }
 
@@ -137,6 +179,31 @@ class VideoEditorViewModel @Inject constructor(
         _uiState.update { it.copy(zoomLevel = zoom.coerceIn(0.5f, 3f)) }
     }
 
+    // ─── Position Polling ─────────────────────────────────────────────────────
+
+    private fun startPositionPolling() {
+        positionPollingJob?.cancel()
+        positionPollingJob = viewModelScope.launch {
+            while (player.isPlaying) {
+                _uiState.update { it.copy(playbackPositionMs = player.currentPosition) }
+                delay(100)
+            }
+        }
+    }
+
+    private fun stopPositionPolling() {
+        positionPollingJob?.cancel()
+        positionPollingJob = null
+    }
+
+    // ─── Player Media Loading ─────────────────────────────────────────────────
+
+    private fun preparePlayerMedia(uri: String) {
+        val mediaItem = MediaItem.fromUri(Uri.parse(uri))
+        player.setMediaItem(mediaItem)
+        player.prepare()
+    }
+
     // ─── Private ──────────────────────────────────────────────────────────────
 
     private fun loadProject(id: Long) {
@@ -160,12 +227,14 @@ class VideoEditorViewModel @Inject constructor(
     private fun createProjectFromMedia(mediaUri: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            val uri = Uri.parse(mediaUri)
+
+            // Query actual media duration before creating project
+            val actualDuration = queryMediaDuration(mediaUri)
             val name = "Project ${System.currentTimeMillis() / 1000}"
+
             when (val result = createProjectUseCase(name = name)) {
                 is Result.Success -> {
                     val newProjectId = result.data
-                    // Create video track and add clip
                     when (val trackResult = addTrackUseCase(newProjectId, "video", 0)) {
                         is Result.Success -> {
                             val trackId = trackResult.data
@@ -174,11 +243,12 @@ class VideoEditorViewModel @Inject constructor(
                                     trackId = trackId,
                                     mediaUri = mediaUri,
                                     startMs = 0,
-                                    endMs = 30_000,
-                                    durationMs = 30_000
+                                    endMs = actualDuration,
+                                    durationMs = actualDuration
                                 )
                             )
                             loadProject(newProjectId)
+                            preparePlayerMedia(mediaUri)
                         }
                         is Result.Error -> {
                             _uiState.update {
@@ -211,7 +281,6 @@ class VideoEditorViewModel @Inject constructor(
                 when (result) {
                     is Result.Success -> {
                         _uiState.update { it.copy(tracks = result.data, isLoading = false) }
-                        // Observe clips for each track
                         result.data.forEach { track -> observeClips(track) }
                     }
                     is Result.Error -> {
@@ -234,11 +303,38 @@ class VideoEditorViewModel @Inject constructor(
                             val totalDuration = newClips.maxOfOrNull { it.timelineStartMs + it.trimmedDurationMs } ?: 0L
                             state.copy(clips = newClips, totalDurationMs = totalDuration)
                         }
+                        // Auto-prepare first video clip in player
+                        if (track.type == "video" && result.data.isNotEmpty()) {
+                            val firstClip = result.data.first()
+                            if (player.mediaItemCount == 0) {
+                                preparePlayerMedia(firstClip.mediaUri)
+                            }
+                        }
                     }
                     else -> {}
                 }
             }
         }
+    }
+
+    private fun queryMediaDuration(mediaUri: String): Long {
+        return try {
+            val retriever = android.media.MediaMetadataRetriever()
+            retriever.setDataSource(viewModelScope.toString(), Uri.parse(mediaUri))
+            val duration = retriever.extractMetadata(
+                android.media.MediaMetadataRetriever.METADATA_KEY_DURATION
+            )?.toLongOrNull() ?: 30_000L
+            retriever.release()
+            duration
+        } catch (_: Exception) {
+            30_000L
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopPositionPolling()
+        player.release()
     }
 }
 

@@ -2,6 +2,8 @@ package com.worldstar.cut.features.video_editor.presentation.ui.screen
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -10,7 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,11 +30,7 @@ import com.worldstar.cut.core.ui.theme.*
 import com.worldstar.cut.features.video_editor.domain.model.Project
 import com.worldstar.cut.features.video_editor.presentation.viewmodel.HomeEvent
 import com.worldstar.cut.features.video_editor.presentation.viewmodel.HomeViewModel
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onNewVideoClick: () -> Unit,
@@ -53,11 +51,38 @@ fun HomeScreen(
         }
     }
 
+    // Delete dialog
     uiState.showDeleteDialog?.let { project ->
-        DeleteProjectDialog(
-            projectName = project.name,
-            onConfirm = viewModel::onDeleteConfirmed,
-            onDismiss = viewModel::onDeleteDismissed
+        AlertDialog(
+            onDismissRequest = viewModel::onDeleteDismissed,
+            containerColor = SurfaceDark,
+            title = {
+                Text("Delete project?", color = TextPrimaryDark, fontWeight = FontWeight.SemiBold)
+            },
+            text = {
+                Text("\"${project.name}\" will be permanently deleted.", color = TextSecondaryDark)
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = viewModel::onDeleteConfirmed,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::onDeleteDismissed) {
+                    Text("Cancel", color = TextSecondaryDark)
+                }
+            }
+        )
+    }
+
+    // Context menu (long-press)
+    uiState.contextMenuProject?.let { project ->
+        ProjectContextMenu(
+            project = project,
+            onRename = { newName -> viewModel.onRenameProject(project, newName) },
+            onDelete = { viewModel.onDeleteProjectClick(project) },
+            onDismiss = viewModel::onDismissContextMenu
         )
     }
 
@@ -118,7 +143,7 @@ fun HomeScreen(
                 color = SurfaceVariantDark
             )
 
-            // Projects section
+            // Projects
             if (uiState.hasProjects) {
                 Row(
                     modifier = Modifier
@@ -149,10 +174,10 @@ fun HomeScreen(
                 ProjectGrid(
                     projects = uiState.recentProjects,
                     onProjectClick = viewModel::onProjectClick,
-                    onProjectLongClick = viewModel::onDeleteProjectClick
+                    onProjectLongClick = viewModel::onProjectLongClick
                 )
             } else if (!uiState.isLoading) {
-                EmptyProjectsState(onNewVideoClick = onNewVideoClick)
+                EmptyProjectsState()
             }
         }
     }
@@ -193,6 +218,7 @@ private fun QuickActionChip(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ProjectGrid(
     projects: List<Project>,
@@ -219,6 +245,7 @@ private fun ProjectGrid(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ProjectCard(
     project: Project,
@@ -229,12 +256,14 @@ private fun ProjectCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
         shape = RoundedCornerShape(12.dp),
         color = SurfaceDark
     ) {
         Column {
-            // Thumbnail
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -242,27 +271,19 @@ private fun ProjectCard(
                     .background(SurfaceVariantDark),
                 contentAlignment = Alignment.Center
             ) {
-                if (project.thumbnailPath != null) {
-                    // CoilAsyncImage would go here in production
-                } else {
-                    Icon(
-                        imageVector = Icons.Outlined.PlayCircleOutline,
-                        contentDescription = null,
-                        tint = TextDisabledDark,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Outlined.PlayCircleOutline,
+                    contentDescription = null,
+                    tint = TextDisabledDark,
+                    modifier = Modifier.size(28.dp)
+                )
 
-                // Duration badge
                 if (project.durationMs > 0) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(6.dp)
-                            .background(
-                                Color.Black.copy(alpha = 0.7f),
-                                RoundedCornerShape(4.dp)
-                            )
+                            .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
                             .padding(horizontal = 5.dp, vertical = 2.dp)
                     ) {
                         Text(
@@ -273,7 +294,6 @@ private fun ProjectCard(
                     }
                 }
 
-                // Exported indicator
                 if (project.isExported) {
                     Box(
                         modifier = Modifier
@@ -286,7 +306,6 @@ private fun ProjectCard(
                 }
             }
 
-            // Info
             Column(modifier = Modifier.padding(10.dp)) {
                 Text(
                     text = project.name,
@@ -307,8 +326,141 @@ private fun ProjectCard(
     }
 }
 
+// ─── Context Menu (long-press) ───────────────────────────────────────────────
+
 @Composable
-private fun EmptyProjectsState(onNewVideoClick: () -> Unit) {
+private fun ProjectContextMenu(
+    project: Project,
+    onRename: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onDelete: () -> Unit
+) {
+    var showRenameDialog by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceDark,
+        title = {
+            Text(
+                text = project.name,
+                color = TextPrimaryDark,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { showRenameDialog = true },
+                    color = SurfaceVariantDark
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(Icons.Outlined.Edit, contentDescription = null, tint = TextSecondaryDark, modifier = Modifier.size(20.dp))
+                        Text("Rename", color = TextPrimaryDark, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable {
+                            onDismiss()
+                            onDelete()
+                        },
+                    color = SurfaceVariantDark
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(Icons.Outlined.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                        Text("Delete", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = TextSecondaryDark)
+            }
+        }
+    )
+
+    // Rename dialog
+    if (showRenameDialog) {
+        RenameProjectDialog(
+            currentName = project.name,
+            onConfirm = { newName ->
+                onRename(newName)
+                showRenameDialog = false
+            },
+            onDismiss = { showRenameDialog = false }
+        )
+    }
+}
+
+@Composable
+private fun RenameProjectDialog(
+    currentName: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var name by remember { mutableStateOf(currentName) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceDark,
+        title = {
+            Text("Rename project", color = TextPrimaryDark, fontWeight = FontWeight.SemiBold)
+        },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                placeholder = { Text("Project name", color = TextDisabledDark) },
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = WorldstarPurpleLight,
+                    unfocusedBorderColor = SurfaceElevated,
+                    focusedTextColor = TextPrimaryDark,
+                    unfocusedTextColor = TextPrimaryDark,
+                    cursorColor = WorldstarPurpleLight
+                ),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(name) },
+                enabled = name.isNotBlank() && name != currentName
+            ) {
+                Text("Save", color = WorldstarPurpleLight)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = TextSecondaryDark)
+            }
+        }
+    )
+}
+
+// ─── Empty State ─────────────────────────────────────────────────────────────
+
+@Composable
+private fun EmptyProjectsState() {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -338,46 +490,6 @@ private fun EmptyProjectsState(onNewVideoClick: () -> Unit) {
     }
 }
 
-@Composable
-private fun DeleteProjectDialog(
-    projectName: String,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = SurfaceDark,
-        title = {
-            Text(
-                text = "Delete project?",
-                color = TextPrimaryDark,
-                fontWeight = FontWeight.SemiBold
-            )
-        },
-        text = {
-            Text(
-                text = "\"$projectName\" will be permanently deleted.",
-                color = TextSecondaryDark
-            )
-        },
-        confirmButton = {
-            TextButton(
-                onClick = onConfirm,
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error
-                )
-            ) {
-                Text("Delete")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = TextSecondaryDark)
-            }
-        }
-    )
-}
-
 private fun formatProjectDate(timestamp: Long): String {
     val diff = System.currentTimeMillis() - timestamp
     val minutes = diff / 60_000
@@ -388,6 +500,6 @@ private fun formatProjectDate(timestamp: Long): String {
         minutes < 60 -> "${minutes}m ago"
         hours < 24 -> "${hours}h ago"
         days < 7 -> "${days}d ago"
-        else -> SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(timestamp))
+        else -> java.text.SimpleDateFormat("MMM d", java.util.Locale.getDefault()).format(java.util.Date(timestamp))
     }
 }

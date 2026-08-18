@@ -2,12 +2,12 @@ package com.worldstar.cut.features.video_editor.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.worldstar.cut.core.domain.result.Failure
 import com.worldstar.cut.core.domain.result.Result
 import com.worldstar.cut.features.video_editor.domain.model.Project
 import com.worldstar.cut.features.video_editor.domain.usecase.CreateProjectUseCase
 import com.worldstar.cut.features.video_editor.domain.usecase.DeleteProjectUseCase
 import com.worldstar.cut.features.video_editor.domain.usecase.GetAllProjectsUseCase
+import com.worldstar.cut.features.video_editor.domain.usecase.UpdateProjectUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,14 +17,14 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val getAllProjectsUseCase: GetAllProjectsUseCase,
     private val createProjectUseCase: CreateProjectUseCase,
-    private val deleteProjectUseCase: DeleteProjectUseCase
+    private val deleteProjectUseCase: DeleteProjectUseCase,
+    private val updateProjectUseCase: UpdateProjectUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -43,31 +43,36 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    fun onProjectLongClick(project: Project) {
+        _uiState.update { it.copy(contextMenuProject = project) }
+    }
+
+    fun onDismissContextMenu() {
+        _uiState.update { it.copy(contextMenuProject = null) }
+    }
+
+    fun onRenameProject(project: Project, newName: String) {
+        if (newName.isBlank()) return
+        _uiState.update { it.copy(contextMenuProject = null) }
+        viewModelScope.launch {
+            updateProjectUseCase(project.copy(name = newName.trim()))
+        }
+    }
+
     fun onDeleteProjectClick(project: Project) {
-        _uiState.update { it.copy(showDeleteDialog = project) }
+        _uiState.update { it.copy(contextMenuProject = null, showDeleteDialog = project) }
     }
 
     fun onDeleteConfirmed() {
         val project = _uiState.value.showDeleteDialog ?: return
         _uiState.update { it.copy(showDeleteDialog = null) }
         viewModelScope.launch {
-            when (val result = deleteProjectUseCase(project.id)) {
-                is Result.Error -> {
-                    _events.emit(HomeEvent.ShowError(result.failure.toReadableMessage()))
-                }
-                else -> { /* deleted successfully */ }
-            }
+            deleteProjectUseCase(project.id)
         }
     }
 
     fun onDeleteDismissed() {
         _uiState.update { it.copy(showDeleteDialog = null) }
-    }
-
-    fun onSettingsClick() {
-        viewModelScope.launch {
-            _events.emit(HomeEvent.OpenSettings)
-        }
     }
 
     private fun observeProjects() {
@@ -98,6 +103,17 @@ class HomeViewModel @Inject constructor(
             }
         }
     }
+}
+
+data class HomeUiState(
+    val isLoading: Boolean = true,
+    val projects: List<Project> = emptyList(),
+    val errorMessage: String? = null,
+    val contextMenuProject: Project? = null,
+    val showDeleteDialog: Project? = null
+) {
+    val hasProjects: Boolean get() = projects.isNotEmpty()
+    val recentProjects: List<Project> get() = projects.take(6)
 }
 
 sealed class HomeEvent {
