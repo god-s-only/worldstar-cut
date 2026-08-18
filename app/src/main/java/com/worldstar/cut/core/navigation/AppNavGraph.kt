@@ -57,11 +57,12 @@ fun AppNavGraph(
             MediaPickerScreen(
                 mediaTypeFilter = mediaType,
                 onMediaSelected = { mediaItem ->
-                    navController.navigate(Screen.VideoEditor.createRoute(-1L)) {
-                        navController.currentBackStackEntry
-                            ?.savedStateHandle
-                            ?.set("selected_media_uri", mediaItem.uri.toString())
-                    }
+                    navController.navigate(
+                        Screen.VideoEditor.createRoute(
+                            projectId = -1L,
+                            mediaUri = mediaItem.uri.toString()
+                        )
+                    )
                 },
                 onBackClick = { navController.popBackStack() }
             )
@@ -72,7 +73,11 @@ fun AppNavGraph(
             arguments = listOf(
                 navArgument(Screen.VideoEditor.ARG_PROJECT_ID) {
                     type = NavType.LongType
-                    defaultValue = -1L
+                },
+                navArgument(Screen.VideoEditor.ARG_SELECTED_MEDIA_URI) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
                 }
             )
         ) {

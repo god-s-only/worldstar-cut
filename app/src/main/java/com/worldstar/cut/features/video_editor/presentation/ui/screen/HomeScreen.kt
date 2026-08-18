@@ -1,7 +1,5 @@
 package com.worldstar.cut.features.video_editor.presentation.ui.screen
 
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -11,16 +9,15 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -31,6 +28,9 @@ import com.worldstar.cut.core.ui.theme.*
 import com.worldstar.cut.features.video_editor.domain.model.Project
 import com.worldstar.cut.features.video_editor.presentation.viewmodel.HomeEvent
 import com.worldstar.cut.features.video_editor.presentation.viewmodel.HomeViewModel
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,14 +46,13 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
-                is HomeEvent.OpenProject  -> onProjectClick(event.projectId)
-                is HomeEvent.OpenSettings -> { /* TODO: navigate to settings */ }
-                is HomeEvent.ShowError    -> { /* TODO: snackbar */ }
+                is HomeEvent.OpenProject -> onProjectClick(event.projectId)
+                is HomeEvent.OpenSettings -> { }
+                is HomeEvent.ShowError -> { }
             }
         }
     }
 
-    // Delete confirmation dialog
     uiState.showDeleteDialog?.let { project ->
         DeleteProjectDialog(
             projectName = project.name,
@@ -65,7 +64,27 @@ fun HomeScreen(
     Scaffold(
         containerColor = BackgroundDark,
         topBar = {
-            HomeTopBar(onSettingsClick = viewModel::onSettingsClick)
+            TopAppBar(
+                title = {
+                    Text(
+                        text = "WorldstarCut",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimaryDark
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
+            )
+        },
+        floatingActionButton = {
+            SmallFloatingActionButton(
+                onClick = onNewVideoClick,
+                containerColor = WorldstarPurpleLight,
+                contentColor = Color.White,
+                shape = CircleShape
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "New project")
+            }
         }
     ) { paddingValues ->
         Column(
@@ -73,186 +92,106 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Hero section
-            HeroSection(
-                onNewVideoClick = onNewVideoClick,
-                onNewPhotoClick = onNewPhotoClick
+            // Quick action row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                QuickActionChip(
+                    icon = Icons.Outlined.Videocam,
+                    label = "New Video",
+                    onClick = onNewVideoClick,
+                    modifier = Modifier.weight(1f)
+                )
+                QuickActionChip(
+                    icon = Icons.Outlined.PhotoLibrary,
+                    label = "New Photo",
+                    onClick = onNewPhotoClick,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = SurfaceVariantDark
             )
 
-            // Recent projects
+            // Projects section
             if (uiState.hasProjects) {
-                SectionHeader(
-                    title = "Recent Projects",
-                    count = uiState.projects.size
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Projects",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Medium,
+                        color = TextSecondaryDark
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = SurfaceVariantDark
+                    ) {
+                        Text(
+                            text = "${uiState.projects.size}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextDisabledDark,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
                 ProjectGrid(
                     projects = uiState.recentProjects,
                     onProjectClick = viewModel::onProjectClick,
                     onProjectLongClick = viewModel::onDeleteProjectClick
                 )
             } else if (!uiState.isLoading) {
-                EmptyProjectsState()
-            }
-        }
-    }
-}
-
-// ─── Top Bar ─────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun HomeTopBar(onSettingsClick: () -> Unit) {
-    TopAppBar(
-        title = {
-            Text(
-                text = "WorldstarCut",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimaryDark
-            )
-        },
-        actions = {
-            IconButton(onClick = onSettingsClick) {
-                Icon(
-                    imageVector = Icons.Outlined.Settings,
-                    contentDescription = "Settings",
-                    tint = TextSecondaryDark
-                )
-            }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = BackgroundDark
-        )
-    )
-}
-
-// ─── Hero Section ────────────────────────────────────────────────────────────
-
-@Composable
-private fun HeroSection(
-    onNewVideoClick: () -> Unit,
-    onNewPhotoClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        WorldstarPurpleDark.copy(alpha = 0.6f),
-                        SurfaceDark
-                    )
-                )
-            )
-            .padding(24.dp)
-    ) {
-        Column {
-            Text(
-                text = "Create Something\nAmazing",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                lineHeight = MaterialTheme.typography.headlineLarge.lineHeight
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            Text(
-                text = "Start a new project or continue where you left off",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondaryDark
-            )
-
-            Spacer(Modifier.height(20.dp))
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                ActionButton(
-                    icon = Icons.Filled.Videocam,
-                    label = "New Video",
-                    gradient = listOf(WorldstarPurpleLight, WorldstarPurpleDark),
-                    onClick = onNewVideoClick,
-                    modifier = Modifier.weight(1f)
-                )
-                ActionButton(
-                    icon = Icons.Filled.PhotoLibrary,
-                    label = "New Photo",
-                    gradient = listOf(WorldstarPink, WorldstarPurpleDark),
-                    onClick = onNewPhotoClick,
-                    modifier = Modifier.weight(1f)
-                )
+                EmptyProjectsState(onNewVideoClick = onNewVideoClick)
             }
         }
     }
 }
 
 @Composable
-private fun ActionButton(
-    icon: ImageVector,
+private fun QuickActionChip(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
-    gradient: List<Color>,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(
+    Surface(
         modifier = modifier
-            .height(56.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(Brush.horizontalGradient(gradient))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp),
-        contentAlignment = Alignment.Center
+            .height(44.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick),
+        color = SurfaceDark
     ) {
         Row(
+            modifier = Modifier.padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(20.dp)
+                tint = WorldstarPurpleLight,
+                modifier = Modifier.size(18.dp)
             )
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.White
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium,
+                color = TextPrimaryDark
             )
         }
     }
 }
-
-// ─── Section Header ──────────────────────────────────────────────────────────
-
-@Composable
-private fun SectionHeader(title: String, count: Int) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = TextPrimaryDark
-        )
-        Text(
-            text = "$count projects",
-            style = MaterialTheme.typography.bodySmall,
-            color = TextSecondaryDark
-        )
-    }
-}
-
-// ─── Project Grid ────────────────────────────────────────────────────────────
 
 @Composable
 private fun ProjectGrid(
@@ -262,9 +201,9 @@ private fun ProjectGrid(
 ) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier.fillMaxSize()
     ) {
         items(
@@ -286,128 +225,118 @@ private fun ProjectCard(
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
-    Card(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize(tween(300))
+            .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceDark)
+        shape = RoundedCornerShape(12.dp),
+        color = SurfaceDark
     ) {
         Column {
-            // Thumbnail placeholder with gradient
+            // Thumbnail
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f)
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(
-                                WorldstarPurpleDark.copy(alpha = 0.4f),
-                                SurfaceVariantDark
-                            )
-                        )
-                    ),
+                    .background(SurfaceVariantDark),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.VideoFile,
-                    contentDescription = null,
-                    tint = TextSecondaryDark.copy(alpha = 0.5f),
-                    modifier = Modifier.size(36.dp)
-                )
+                if (project.thumbnailPath != null) {
+                    // CoilAsyncImage would go here in production
+                } else {
+                    Icon(
+                        imageVector = Icons.Outlined.PlayCircleOutline,
+                        contentDescription = null,
+                        tint = TextDisabledDark,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
 
-                // Exported badge
-                if (project.isExported) {
+                // Duration badge
+                if (project.durationMs > 0) {
                     Box(
                         modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(8.dp)
-                            .size(24.dp)
-                            .clip(CircleShape)
-                            .background(WorldstarCyanDark),
-                        contentAlignment = Alignment.Center
+                            .align(Alignment.BottomEnd)
+                            .padding(6.dp)
+                            .background(
+                                Color.Black.copy(alpha = 0.7f),
+                                RoundedCornerShape(4.dp)
+                            )
+                            .padding(horizontal = 5.dp, vertical = 2.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Check,
-                            contentDescription = "Exported",
-                            tint = Color.White,
-                            modifier = Modifier.size(14.dp)
+                        Text(
+                            text = project.durationFormatted,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White
                         )
                     }
                 }
+
+                // Exported indicator
+                if (project.isExported) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(6.dp)
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(WorldstarCyan)
+                    )
+                }
             }
 
-            Column(modifier = Modifier.padding(12.dp)) {
+            // Info
+            Column(modifier = Modifier.padding(10.dp)) {
                 Text(
                     text = project.name,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     color = TextPrimaryDark,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-
-                Spacer(Modifier.height(4.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = project.resolutionLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondaryDark
-                    )
-                    Text(
-                        text = project.timeAgo,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondaryDark
-                    )
-                }
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = formatProjectDate(project.updatedAt),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextDisabledDark
+                )
             }
         }
     }
 }
 
-// ─── Empty State ─────────────────────────────────────────────────────────────
-
 @Composable
-private fun EmptyProjectsState() {
+private fun EmptyProjectsState(onNewVideoClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .padding(horizontal = 32.dp, vertical = 64.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(
             imageVector = Icons.Outlined.VideoLibrary,
             contentDescription = null,
             tint = TextDisabledDark,
-            modifier = Modifier.size(64.dp)
+            modifier = Modifier.size(48.dp)
         )
-
         Spacer(Modifier.height(16.dp))
-
         Text(
             text = "No projects yet",
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium,
             color = TextSecondaryDark
         )
-
-        Spacer(Modifier.height(8.dp))
-
+        Spacer(Modifier.height(6.dp))
         Text(
-            text = "Tap \"New Video\" or \"New Photo\" to\nstart creating",
-            style = MaterialTheme.typography.bodyMedium,
+            text = "Tap + to import your first video",
+            style = MaterialTheme.typography.bodySmall,
             color = TextDisabledDark,
             textAlign = TextAlign.Center
         )
     }
 }
-
-// ─── Delete Dialog ───────────────────────────────────────────────────────────
 
 @Composable
 private fun DeleteProjectDialog(
@@ -420,14 +349,14 @@ private fun DeleteProjectDialog(
         containerColor = SurfaceDark,
         title = {
             Text(
-                text = "Delete Project",
+                text = "Delete project?",
                 color = TextPrimaryDark,
                 fontWeight = FontWeight.SemiBold
             )
         },
         text = {
             Text(
-                text = "Delete \"$projectName\"? This cannot be undone.",
+                text = "\"$projectName\" will be permanently deleted.",
                 color = TextSecondaryDark
             )
         },
@@ -447,4 +376,18 @@ private fun DeleteProjectDialog(
             }
         }
     )
+}
+
+private fun formatProjectDate(timestamp: Long): String {
+    val diff = System.currentTimeMillis() - timestamp
+    val minutes = diff / 60_000
+    val hours = diff / 3_600_000
+    val days = diff / 86_400_000
+    return when {
+        minutes < 1 -> "Just now"
+        minutes < 60 -> "${minutes}m ago"
+        hours < 24 -> "${hours}h ago"
+        days < 7 -> "${days}d ago"
+        else -> SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(timestamp))
+    }
 }

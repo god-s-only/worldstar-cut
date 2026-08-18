@@ -1,5 +1,7 @@
 package com.worldstar.cut.core.navigation
 
+import android.net.Uri
+
 sealed class Screen(val route: String) {
 
     data object Home : Screen("home")
@@ -14,11 +16,15 @@ sealed class Screen(val route: String) {
     }
 
     data class VideoEditor(val projectId: Long = -1L) :
-        Screen("video_editor/{project_id}") {
+        Screen("video_editor/{project_id}?selected_media_uri={selected_media_uri}") {
         companion object {
-            const val ROUTE = "video_editor/{project_id}"
+            const val ROUTE = "video_editor/{project_id}?selected_media_uri={selected_media_uri}"
             const val ARG_PROJECT_ID = "project_id"
-            fun createRoute(projectId: Long = -1L) = "video_editor/$projectId"
+            const val ARG_SELECTED_MEDIA_URI = "selected_media_uri"
+            fun createRoute(projectId: Long = -1L, mediaUri: String? = null): String {
+                val base = "video_editor/$projectId"
+                return if (mediaUri != null) "$base?selected_media_uri=${Uri.encode(mediaUri)}" else base
+            }
         }
     }
 
