@@ -2,6 +2,7 @@ package com.worldstar.cut.features.trim_cut.data.repository
 
 import android.content.Context
 import android.media.MediaExtractor
+import java.nio.ByteBuffer
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.net.Uri
@@ -141,7 +142,7 @@ class TrimCutRepositoryImpl @Inject constructor(
                 var readCount: Int
                 var sampleCount = 0
 
-                while (extractor.readSampleData(android.media.ByteBuffer.wrap(buffer), 0)
+                while (extractor.readSampleData(ByteBuffer.wrap(buffer), 0)
                         .also { readCount = it } >= 0 && sampleCount < 200
                 ) {
                     val avgAmplitude = buffer.take(readCount.coerceAtMost(buffer.size))
