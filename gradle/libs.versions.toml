@@ -19,7 +19,7 @@ gson = "2.11.0"
 timber = "5.0.1"
 splashscreen = "1.0.1"
 lottie = "6.6.0"
-ffmpeg = "6.0-2.2"
+ffmpeg = "8.1.7"
 billingKtx = "7.1.1"
 junit = "4.13.2"
 junitExt = "1.2.1"
@@ -91,7 +91,7 @@ timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "tim
 lottie-compose = { group = "com.airbnb.android", name = "lottie-compose", version.ref = "lottie" }
 
 # FFmpeg (video processing)
-ffmpeg-kit-full = { group = "com.arthenica", name = "ffmpeg-kit-full", version.ref = "ffmpeg" }
+ffmpeg-kit-full = { group = "dev.ffmpegkit-maintained", name = "ffmpeg-kit-full", version.ref = "ffmpeg" }
 
 # Google Play Billing
 billing-ktx = { group = "com.android.billingclient", name = "billing-ktx", version.ref = "billingKtx" }
