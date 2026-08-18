@@ -42,6 +42,10 @@ import kotlin.math.roundToInt
 @Composable
 fun VideoEditorScreen(
     onExportClick: (Long) -> Unit,
+    onTrimClick: (Long) -> Unit = {},
+    onAudioClick: (Long) -> Unit = {},
+    onFiltersClick: (Long) -> Unit = {},
+    onTextClick: (Long) -> Unit = {},
     onPremiumRequired: () -> Unit,
     onBackClick: () -> Unit,
     viewModel: VideoEditorViewModel = hiltViewModel()

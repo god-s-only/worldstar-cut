@@ -9,16 +9,13 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.worldstar.cut.features.export.presentation.ui.screen.ExportScreen
 import com.worldstar.cut.features.media_picker.presentation.ui.screen.MediaPickerScreen
-import com.worldstar.cut.features.premium.presentation.ui.screen.PremiumScreen
 import com.worldstar.cut.features.video_editor.presentation.ui.screen.VideoEditorScreen
 import com.worldstar.cut.features.video_editor.presentation.ui.screen.HomeScreen
+import com.worldstar.cut.features.trim_cut.presentation.ui.screen.TrimCutScreen
+import com.worldstar.cut.features.audio.presentation.ui.screen.AudioEditorScreen
+import com.worldstar.cut.features.filters_effects.presentation.ui.screen.FiltersEffectsScreen
+import com.worldstar.cut.features.text_sticker.presentation.ui.screen.TextStickerScreen
 
-/**
- * Root navigation host.
- * All Composable screens are registered here.
- * Feature-specific nav logic stays inside this graph — the screen Composables
- * themselves only receive typed callbacks (lambdas), keeping them nav-agnostic.
- */
 @Composable
 fun AppNavGraph(
     navController: NavHostController,
@@ -30,7 +27,6 @@ fun AppNavGraph(
         modifier = modifier
     ) {
 
-        // ─── Home ─────────────────────────────────────────────────────────
         composable(route = Screen.Home.route) {
             HomeScreen(
                 onNewVideoClick = {
@@ -42,13 +38,10 @@ fun AppNavGraph(
                 onProjectClick = { projectId ->
                     navController.navigate(Screen.VideoEditor.createRoute(projectId))
                 },
-                onPremiumClick = {
-                    navController.navigate(Screen.Premium.route)
-                }
+                onPremiumClick = {}
             )
         }
 
-        // ─── Media Picker ─────────────────────────────────────────────────
         composable(
             route = Screen.MediaPicker.ROUTE,
             arguments = listOf(
@@ -64,10 +57,7 @@ fun AppNavGraph(
             MediaPickerScreen(
                 mediaTypeFilter = mediaType,
                 onMediaSelected = { mediaItem ->
-                    // Pass the selected media URI to a new editor project
                     navController.navigate(Screen.VideoEditor.createRoute(-1L)) {
-                        // Put the selected URI in SavedStateHandle so the editor
-                        // ViewModel can pick it up
                         navController.currentBackStackEntry
                             ?.savedStateHandle
                             ?.set("selected_media_uri", mediaItem.uri.toString())
@@ -77,7 +67,6 @@ fun AppNavGraph(
             )
         }
 
-        // ─── Video Editor ─────────────────────────────────────────────────
         composable(
             route = Screen.VideoEditor.ROUTE,
             arguments = listOf(
@@ -91,14 +80,75 @@ fun AppNavGraph(
                 onExportClick = { projectId ->
                     navController.navigate(Screen.Export.createRoute(projectId))
                 },
-                onPremiumRequired = {
-                    navController.navigate(Screen.Premium.route)
+                onTrimClick = { projectId ->
+                    navController.navigate(Screen.TrimCut.createRoute(projectId))
                 },
+                onAudioClick = { projectId ->
+                    navController.navigate(Screen.AudioEditor.createRoute(projectId))
+                },
+                onFiltersClick = { projectId ->
+                    navController.navigate(Screen.FiltersEffects.createRoute(projectId))
+                },
+                onTextClick = { projectId ->
+                    navController.navigate(Screen.TextSticker.createRoute(projectId))
+                },
+                onPremiumRequired = {},
                 onBackClick = { navController.popBackStack() }
             )
         }
 
-        // ─── Export ───────────────────────────────────────────────────────
+        composable(
+            route = Screen.TrimCut.ROUTE,
+            arguments = listOf(
+                navArgument(Screen.TrimCut.ARG_PROJECT_ID) {
+                    type = NavType.LongType
+                }
+            )
+        ) {
+            TrimCutScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Screen.AudioEditor.ROUTE,
+            arguments = listOf(
+                navArgument(Screen.AudioEditor.ARG_PROJECT_ID) {
+                    type = NavType.LongType
+                }
+            )
+        ) {
+            AudioEditorScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Screen.FiltersEffects.ROUTE,
+            arguments = listOf(
+                navArgument(Screen.FiltersEffects.ARG_PROJECT_ID) {
+                    type = NavType.LongType
+                }
+            )
+        ) {
+            FiltersEffectsScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Screen.TextSticker.ROUTE,
+            arguments = listOf(
+                navArgument(Screen.TextSticker.ARG_PROJECT_ID) {
+                    type = NavType.LongType
+                }
+            )
+        ) {
+            TextStickerScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
         composable(
             route = Screen.Export.ROUTE,
             arguments = listOf(
@@ -109,23 +159,12 @@ fun AppNavGraph(
         ) {
             ExportScreen(
                 onExportComplete = { outputPath ->
-                    // Navigate back to home after successful export
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }
                     }
                 },
-                onPremiumRequired = {
-                    navController.navigate(Screen.Premium.route)
-                },
+                onPremiumRequired = {},
                 onBackClick = { navController.popBackStack() }
-            )
-        }
-
-        // ─── Premium ──────────────────────────────────────────────────────
-        composable(route = Screen.Premium.route) {
-            PremiumScreen(
-                onSubscribed = { navController.popBackStack() },
-                onBackClick  = { navController.popBackStack() }
             )
         }
     }
