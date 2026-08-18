@@ -63,7 +63,7 @@ class ExportRepositoryImpl @Inject constructor(
                 } else {
                     val error = session.failStackTrace ?: "Unknown FFmpeg error"
                     _exportState.value = ExportState.Failed(error)
-                    Result.Error(Failure.ProcessingError(error, session.returnCode.code))
+                    Result.Error(Failure.ProcessingError(error, session.returnCode.value))
                 }
             }.getOrElse { e ->
                 Timber.e(e, "Export failed")
@@ -75,10 +75,8 @@ class ExportRepositoryImpl @Inject constructor(
 
     override fun cancelExport() {
         currentSession?.let { session ->
-            if (session.isRunning) {
-                FFmpegKit.cancel(session.sessionId)
-                _exportState.value = ExportState.Failed("Export cancelled by user")
-            }
+            FFmpegKit.cancel(session.sessionId)
+            _exportState.value = ExportState.Failed("Export cancelled by user")
         }
     }
 
