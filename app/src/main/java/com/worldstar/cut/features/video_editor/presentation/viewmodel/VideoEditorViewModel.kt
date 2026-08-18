@@ -148,8 +148,7 @@ class VideoEditorViewModel @Inject constructor(
         val clip = _uiState.value.selectedClip ?: return
         viewModelScope.launch {
             updateClipUseCase(clip.copy(speed = speed))
-            val params = player.playbackParameters
-            player.playbackParameters = params.copyWithSpeed(speed)
+            player.playbackParameters = androidx.media3.common.PlaybackParameters(speed)
         }
     }
 
@@ -319,8 +318,9 @@ class VideoEditorViewModel @Inject constructor(
 
     private fun queryMediaDuration(mediaUri: String): Long {
         return try {
+            val context = application.applicationContext
             val retriever = android.media.MediaMetadataRetriever()
-            retriever.setDataSource(viewModelScope.toString(), Uri.parse(mediaUri))
+            retriever.setDataSource(context, Uri.parse(mediaUri))
             val duration = retriever.extractMetadata(
                 android.media.MediaMetadataRetriever.METADATA_KEY_DURATION
             )?.toLongOrNull() ?: 30_000L
