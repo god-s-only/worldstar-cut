@@ -129,9 +129,6 @@ dependencies {
     // FFmpeg
     implementation(libs.ffmpeg.kit.full)
 
-    // Billing
-    implementation(libs.billing.ktx)
-
     // Testing
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
