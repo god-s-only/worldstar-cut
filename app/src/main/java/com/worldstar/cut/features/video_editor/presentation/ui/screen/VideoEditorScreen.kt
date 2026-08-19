@@ -33,6 +33,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavHostController
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.exoplayer.ExoPlayer
@@ -52,12 +53,26 @@ fun VideoEditorScreen(
     onAudioClick: (Long) -> Unit = {},
     onFiltersClick: (Long) -> Unit = {},
     onTextClick: (Long) -> Unit = {},
+    onAddMediaClick: (Long) -> Unit = {},
     onPremiumRequired: () -> Unit,
     onBackClick: () -> Unit,
+    navController: NavHostController? = null,
     viewModel: VideoEditorViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
+    val currentBackStackEntry = navController?.currentBackStackEntryAsState()?.value
+
+    // Observe added media from media picker
+    LaunchedEffect(currentBackStackEntry) {
+        currentBackStackEntry?.savedStateHandle?.getStateFlow<String?>("added_media_uri", null)
+            ?.collect { uri ->
+                if (uri != null) {
+                    viewModel.onMediaAdded(uri)
+                    currentBackStackEntry?.savedStateHandle?.remove<String>("added_media_uri")
+                }
+            }
+    }
 
     // Pause player when leaving the screen
     DisposableEffect(lifecycleOwner) {
@@ -77,6 +92,9 @@ fun VideoEditorScreen(
             when (event) {
                 is VideoEditorEvent.NavigateToExport -> {
                     uiState.project?.let { onExportClick(it.id) }
+                }
+                is VideoEditorEvent.NavigateToAddMedia -> {
+                    onAddMediaClick(event.projectId)
                 }
                 is VideoEditorEvent.NavigateToPremium -> onPremiumRequired()
                 is VideoEditorEvent.NavigateBack -> onBackClick()
@@ -154,6 +172,7 @@ fun VideoEditorScreen(
                 onClipSelected = viewModel::onClipSelected,
                 onSeek = viewModel::onSeekTo,
                 onZoomChanged = viewModel::onZoomChanged,
+                onAddMedia = viewModel::onAddMediaClicked,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(160.dp)
@@ -637,6 +656,7 @@ private fun Timeline(
     onClipSelected: (Long?) -> Unit,
     onSeek: (Long) -> Unit,
     onZoomChanged: (Float) -> Unit,
+    onAddMedia: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -644,7 +664,7 @@ private fun Timeline(
             .background(TimelineBackground)
             .padding(top = 8.dp)
     ) {
-        // Timeline header with zoom controls
+        // Timeline header with zoom controls and add media button
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -658,6 +678,9 @@ private fun Timeline(
                 color = TextSecondaryDark
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onAddMedia) {
+                    Icon(Icons.Filled.Add, "Add media", tint = WorldstarCyan, modifier = Modifier.size(18.dp))
+                }
                 IconButton(onClick = { onZoomChanged(zoomLevel - 0.25f) }) {
                     Icon(Icons.Filled.ZoomOut, "Zoom out", tint = TextSecondaryDark, modifier = Modifier.size(18.dp))
                 }

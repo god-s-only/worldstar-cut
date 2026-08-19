@@ -7,11 +7,13 @@ sealed class Screen(val route: String) {
     data object Home : Screen("home")
 
     data class MediaPicker(val mediaType: String = "all") :
-        Screen("media_picker/{media_type}") {
+        Screen("media_picker/{media_type}?from_editor={from_editor}") {
         companion object {
-            const val ROUTE = "media_picker/{media_type}"
+            const val ROUTE = "media_picker/{media_type}?from_editor={from_editor}"
             const val ARG_MEDIA_TYPE = "media_type"
-            fun createRoute(mediaType: String = "all") = "media_picker/$mediaType"
+            const val ARG_FROM_EDITOR = "from_editor"
+            fun createRoute(mediaType: String = "all", fromEditor: Boolean = false) =
+                "media_picker/$mediaType?from_editor=$fromEditor"
         }
     }
 

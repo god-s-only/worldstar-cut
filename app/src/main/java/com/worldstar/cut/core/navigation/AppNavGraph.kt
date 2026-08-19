@@ -48,21 +48,34 @@ fun AppNavGraph(
                 navArgument(Screen.MediaPicker.ARG_MEDIA_TYPE) {
                     type = NavType.StringType
                     defaultValue = "all"
+                },
+                navArgument(Screen.MediaPicker.ARG_FROM_EDITOR) {
+                    type = NavType.BoolType
+                    defaultValue = false
                 }
             )
         ) { backStackEntry ->
             val mediaType = backStackEntry.arguments
                 ?.getString(Screen.MediaPicker.ARG_MEDIA_TYPE) ?: "all"
+            val fromEditor = backStackEntry.arguments
+                ?.getBoolean(Screen.MediaPicker.ARG_FROM_EDITOR) ?: false
 
             MediaPickerScreen(
                 mediaTypeFilter = mediaType,
                 onMediaSelected = { mediaItem ->
-                    navController.navigate(
-                        Screen.VideoEditor.createRoute(
-                            projectId = -1L,
-                            mediaUri = mediaItem.uri.toString()
+                    if (fromEditor) {
+                        navController.previousBackStackEntry
+                            ?.savedStateHandle
+                            ?.set("added_media_uri", mediaItem.uri.toString())
+                        navController.popBackStack()
+                    } else {
+                        navController.navigate(
+                            Screen.VideoEditor.createRoute(
+                                projectId = -1L,
+                                mediaUri = mediaItem.uri.toString()
+                            )
                         )
-                    )
+                    }
                 },
                 onBackClick = { navController.popBackStack() }
             )
@@ -97,8 +110,12 @@ fun AppNavGraph(
                 onTextClick = { projectId ->
                     navController.navigate(Screen.TextSticker.createRoute(projectId))
                 },
+                onAddMediaClick = { projectId ->
+                    navController.navigate(Screen.MediaPicker.createRoute("all", fromEditor = true))
+                },
                 onPremiumRequired = {},
-                onBackClick = { navController.popBackStack() }
+                onBackClick = { navController.popBackStack() },
+                navController = navController
             )
         }
 
