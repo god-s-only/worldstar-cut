@@ -20,7 +20,11 @@ data class Clip(
     val textSize: Float? = null,
     val effectType: String? = null,
     val transitionType: String? = null,
-    val transitionDurationMs: Long = 500L
+    val transitionDurationMs: Long = 500L,
+    val cropX: Float = 0f,
+    val cropY: Float = 0f,
+    val cropW: Float = 1f,
+    val cropH: Float = 1f
 ) {
     val trimmedDurationMs: Long
         get() = (endMs - startMs) - (trimStartMs + trimEndMs)
@@ -30,4 +34,5 @@ data class Clip(
     val hasText: Boolean get() = !text.isNullOrBlank()
     val hasEffect: Boolean get() = effectType != null
     val hasTransition: Boolean get() = transitionType != null
+    val isCropped: Boolean get() = cropX != 0f || cropY != 0f || cropW != 1f || cropH != 1f
 }
