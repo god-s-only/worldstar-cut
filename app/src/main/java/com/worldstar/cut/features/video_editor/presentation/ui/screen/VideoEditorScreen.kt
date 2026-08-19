@@ -281,26 +281,11 @@ private fun VideoPreview(
                                 contentDescription = "Play",
                                 tint = Color.White,
                                 modifier = Modifier.size(32.dp)
-                )
+                            )
+                        }
+                    }
+                }
             }
-        }
-
-        // Audio button (navigates to audio editor)
-        IconButton(
-            onClick = onAudioClick,
-            modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(12.dp))
-        ) {
-            Icon(
-                imageVector = Icons.Filled.MusicNote,
-                contentDescription = "Audio",
-                tint = WorldstarCyan,
-                modifier = Modifier.size(22.dp)
-            )
-        }
-    }
-}
         } else {
             // No media loaded state
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -395,6 +380,21 @@ private fun EditorToolsBar(
                     modifier = Modifier.size(22.dp)
                 )
             }
+        }
+
+        // Audio button (navigates to audio editor)
+        IconButton(
+            onClick = onAudioClick,
+            modifier = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(12.dp))
+        ) {
+            Icon(
+                imageVector = Icons.Filled.MusicNote,
+                contentDescription = "Audio",
+                tint = WorldstarCyan,
+                modifier = Modifier.size(22.dp)
+            )
         }
     }
 }
