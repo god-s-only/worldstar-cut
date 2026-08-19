@@ -176,7 +176,8 @@ class TrackClipRepositoryImpl @Inject constructor(
         textPosY = textPosY,
         textSizeSp = textSizeSp,
         textRotation = textRotation,
-        fontFamily = fontFamily
+        fontFamily = fontFamily,
+        textOverlays = textOverlays
     )
 
     private fun Clip.toEntity() = ClipEntity(
@@ -208,6 +209,7 @@ class TrackClipRepositoryImpl @Inject constructor(
         textPosY = textPosY,
         textSizeSp = textSizeSp,
         textRotation = textRotation,
-        fontFamily = fontFamily
+        fontFamily = fontFamily,
+        textOverlays = textOverlays
     )
 }
