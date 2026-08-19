@@ -46,5 +46,6 @@ data class ClipEntity(
     val textPosX: Float = 0.5f,
     val textPosY: Float = 0.5f,
     val textSizeSp: Float = 24f,
-    val textRotation: Float = 0f
+    val textRotation: Float = 0f,
+    val fontFamily: String = "default"
 )

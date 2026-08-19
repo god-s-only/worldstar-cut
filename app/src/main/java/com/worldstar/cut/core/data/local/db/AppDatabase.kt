@@ -26,7 +26,7 @@ import com.worldstar.cut.features.export.data.local.db.ExportHistoryEntity
         ClipEntity::class,
         ExportHistoryEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 @TypeConverters(RoomTypeConverters::class)
@@ -68,6 +68,12 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE clips ADD COLUMN textPosY REAL NOT NULL DEFAULT 0.5")
                 db.execSQL("ALTER TABLE clips ADD COLUMN textSizeSp REAL NOT NULL DEFAULT 24.0")
                 db.execSQL("ALTER TABLE clips ADD COLUMN textRotation REAL NOT NULL DEFAULT 0.0")
+            }
+        }
+
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE clips ADD COLUMN fontFamily TEXT NOT NULL DEFAULT 'default'")
             }
         }
     }
