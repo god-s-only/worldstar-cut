@@ -228,6 +228,39 @@ class VideoEditorViewModel @Inject constructor(
         }
     }
 
+    fun onAudioAdded(audioUri: String) {
+        val currentProject = _uiState.value.project ?: return
+        viewModelScope.launch {
+            // Ensure an audio track exists
+            var audioTrack = _uiState.value.tracks.firstOrNull { it.type == "audio" }
+            if (audioTrack == null) {
+                when (val result = addTrackUseCase(currentProject.id, "audio", 1)) {
+                    is Result.Success -> {
+                        // Track will be observed automatically; re-fetch
+                        return@launch
+                    }
+                    else -> return@launch
+                }
+            }
+            audioTrack = _uiState.value.tracks.firstOrNull { it.type == "audio" } ?: return@launch
+            val duration = queryMediaDuration(audioUri)
+            val clipCount = _uiState.value.audioClips.size
+            addClipUseCase(
+                Clip(
+                    trackId = audioTrack.id,
+                    mediaUri = audioUri,
+                    mediaType = "audio",
+                    startMs = 0,
+                    endMs = duration,
+                    durationMs = duration,
+                    order = clipCount
+                )
+            )
+        }
+    }
+        }
+    }
+
     fun onZoomChanged(zoom: Float) {
         _uiState.update { it.copy(zoomLevel = zoom.coerceIn(0.5f, 3f)) }
     }
