@@ -258,8 +258,7 @@ class VideoEditorViewModel @Inject constructor(
             )
         }
     }
-        }
-    }
+
 
     fun onZoomChanged(zoom: Float) {
         _uiState.update { it.copy(zoomLevel = zoom.coerceIn(0.5f, 3f)) }

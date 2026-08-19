@@ -261,52 +261,46 @@ private fun VideoPreview(
                         "B&W" -> ColorFilter.colorMatrix(ColorMatrix().apply {
                             setToSaturation(0f)
                         })
-                        "Noir" -> ColorFilter.colorMatrix(ColorMatrix().apply {
-                            setToSaturation(0f)
-                            val contrast = floatArrayOf(
+                        "Noir" -> ColorFilter.colorMatrix(ColorMatrix(
+                            floatArrayOf(
                                 1.5f, 0f, 0f, 0f, -40f,
                                 0f, 1.5f, 0f, 0f, -40f,
                                 0f, 0f, 1.5f, 0f, -40f,
                                 0f, 0f, 0f, 1f, 0f
                             )
-                            set(contrast)
-                        })
-                        "Vintage" -> ColorFilter.colorMatrix(ColorMatrix().apply {
-                            val vintage = floatArrayOf(
+                        ))
+                        "Vintage" -> ColorFilter.colorMatrix(ColorMatrix(
+                            floatArrayOf(
                                 0.6f, 0.3f, 0.1f, 0f, 20f,
                                 0.2f, 0.6f, 0.1f, 0f, 10f,
                                 0.1f, 0.2f, 0.5f, 0f, 5f,
                                 0f, 0f, 0f, 1f, 0f
                             )
-                            set(vintage)
-                        })
-                        "Vivid" -> ColorFilter.colorMatrix(ColorMatrix().apply {
-                            val vivid = floatArrayOf(
+                        ))
+                        "Vivid" -> ColorFilter.colorMatrix(ColorMatrix(
+                            floatArrayOf(
                                 1.4f, 0f, 0f, 0f, 10f,
                                 0f, 1.4f, 0f, 0f, 10f,
                                 0f, 0f, 1.4f, 0f, 10f,
                                 0f, 0f, 0f, 1f, 0f
                             )
-                            set(vivid)
-                        })
-                        "Cool" -> ColorFilter.colorMatrix(ColorMatrix().apply {
-                            val cool = floatArrayOf(
+                        ))
+                        "Cool" -> ColorFilter.colorMatrix(ColorMatrix(
+                            floatArrayOf(
                                 0.9f, 0f, 0.1f, 0f, 0f,
                                 0f, 0.9f, 0.1f, 0f, 0f,
                                 0.1f, 0.1f, 1.2f, 0f, 15f,
                                 0f, 0f, 0f, 1f, 0f
                             )
-                            set(cool)
-                        })
-                        "Warm" -> ColorFilter.colorMatrix(ColorMatrix().apply {
-                            val warm = floatArrayOf(
+                        ))
+                        "Warm" -> ColorFilter.colorMatrix(ColorMatrix(
+                            floatArrayOf(
                                 1.2f, 0.1f, 0f, 0f, 15f,
                                 0f, 1.0f, 0f, 0f, 5f,
                                 0f, 0f, 0.8f, 0f, 0f,
                                 0f, 0f, 0f, 1f, 0f
                             )
-                            set(warm)
-                        })
+                        ))
                         else -> null
                     }
                 }
