@@ -64,7 +64,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VideoEditorScreen(
-    onExportClick: (Long) -> Unit,
+    onExportClick: (Long, Boolean) -> Unit,
     onTrimClick: (Long) -> Unit = {},
     onAudioClick: (Long) -> Unit = {},
     onFiltersClick: (Long) -> Unit = {},
@@ -114,7 +114,10 @@ fun VideoEditorScreen(
         viewModel.events.collect { event ->
             when (event) {
                 is VideoEditorEvent.NavigateToExport -> {
-                    uiState.project?.let { onExportClick(it.id) }
+                    uiState.project?.let { proj ->
+                        val isImage = uiState.videoClips.firstOrNull()?.isImage == true
+                        onExportClick(proj.id, isImage)
+                    }
                 }
                 is VideoEditorEvent.NavigateToAddMedia -> {
                     onAddMediaClick(event.projectId)
@@ -133,7 +136,10 @@ fun VideoEditorScreen(
                 projectName = uiState.project?.name ?: "New Project",
                 onBackClick = onBackClick,
                 onExportClick = {
-                    uiState.project?.let { onExportClick(it.id) }
+                    uiState.project?.let { proj ->
+                        val isImage = uiState.videoClips.firstOrNull()?.isImage == true
+                        onExportClick(proj.id, isImage)
+                    }
                 }
             )
         }

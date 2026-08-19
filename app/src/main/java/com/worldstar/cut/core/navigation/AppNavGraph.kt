@@ -95,8 +95,8 @@ fun AppNavGraph(
             )
         ) {
             VideoEditorScreen(
-                onExportClick = { projectId ->
-                    navController.navigate(Screen.Export.createRoute(projectId))
+                onExportClick = { projectId, isImage ->
+                    navController.navigate(Screen.Export.createRoute(projectId, isImage))
                 },
                 onTrimClick = { projectId ->
                     navController.navigate(Screen.TrimCut.createRoute(projectId))
@@ -176,10 +176,16 @@ fun AppNavGraph(
             arguments = listOf(
                 navArgument(Screen.Export.ARG_PROJECT_ID) {
                     type = NavType.LongType
+                },
+                navArgument(Screen.Export.ARG_IS_IMAGE) {
+                    type = NavType.BoolType
+                    defaultValue = false
                 }
             )
-        ) {
+        ) { backStackEntry ->
+            val isImage = backStackEntry.arguments?.getBoolean(Screen.Export.ARG_IS_IMAGE) ?: false
             ExportScreen(
+                isImage = isImage,
                 onExportComplete = { outputPath ->
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }

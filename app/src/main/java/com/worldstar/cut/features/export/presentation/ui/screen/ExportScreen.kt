@@ -33,6 +33,7 @@ import com.worldstar.cut.features.export.presentation.viewmodel.ExportViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExportScreen(
+    isImage: Boolean = false,
     onExportComplete: (String) -> Unit,
     onPremiumRequired: () -> Unit,
     onBackClick: () -> Unit,
@@ -73,6 +74,7 @@ fun ExportScreen(
             when (state) {
                 is ExportState.Completed -> ExportCompleteContent(
                     outputPath = state.outputPath,
+                    isImage = isImage,
                     onDone = { onExportComplete(state.outputPath) }
                 )
                 is ExportState.InProgress, is ExportState.Preparing -> ExportProgressContent(
@@ -87,6 +89,7 @@ fun ExportScreen(
                 )
                 is ExportState.Idle -> ExportSettingsContent(
                     uiState = uiState,
+                    isImage = isImage,
                     onResolutionSelected = viewModel::onResolutionSelected,
                     onFrameRateSelected = viewModel::onFrameRateSelected,
                     onStartExport = viewModel::onStartExport
@@ -101,6 +104,7 @@ fun ExportScreen(
 @Composable
 private fun ExportSettingsContent(
     uiState: com.worldstar.cut.features.export.presentation.viewmodel.ExportUiState,
+    isImage: Boolean = false,
     onResolutionSelected: (ExportResolution) -> Unit,
     onFrameRateSelected: (Int) -> Unit,
     onStartExport: () -> Unit
@@ -156,39 +160,41 @@ private fun ExportSettingsContent(
             }
         }
 
-        // Frame Rate
-        item {
-            Text(
-                text = "Frame Rate",
-                style = MaterialTheme.typography.titleMedium,
-                color = TextPrimaryDark,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                uiState.frameRates.forEach { fps ->
-                    val isSelected = fps == uiState.selectedFrameRate
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                if (isSelected) WorldstarPurpleLight
-                                else SurfaceDark
+        // Frame Rate (video only)
+        if (!isImage) {
+            item {
+                Text(
+                    text = "Frame Rate",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextPrimaryDark,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    uiState.frameRates.forEach { fps ->
+                        val isSelected = fps == uiState.selectedFrameRate
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    if (isSelected) WorldstarPurpleLight
+                                    else SurfaceDark
+                                )
+                                .clickable { onFrameRateSelected(fps) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "${fps} fps",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = if (isSelected) Color.White else TextSecondaryDark,
+                                fontWeight = FontWeight.SemiBold
                             )
-                            .clickable { onFrameRateSelected(fps) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "${fps} fps",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = if (isSelected) Color.White else TextSecondaryDark,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        }
                     }
                 }
             }
@@ -208,7 +214,7 @@ private fun ExportSettingsContent(
                 Icon(Icons.Default.FileUpload, contentDescription = null, tint = Color.White)
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    "Export Video",
+                    if (isImage) "Export Image" else "Export Video",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -291,7 +297,7 @@ private fun ExportProgressContent(
 // ─── Complete Content ────────────────────────────────────────────────────────
 
 @Composable
-private fun ExportCompleteContent(outputPath: String, onDone: () -> Unit) {
+private fun ExportCompleteContent(outputPath: String, isImage: Boolean = false, onDone: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -326,7 +332,7 @@ private fun ExportCompleteContent(outputPath: String, onDone: () -> Unit) {
         Spacer(Modifier.height(8.dp))
 
         Text(
-            text = "Your video has been saved to:\n$outputPath",
+            text = if (isImage) "Your image has been saved to:\n$outputPath" else "Your video has been saved to:\n$outputPath",
             style = MaterialTheme.typography.bodyMedium,
             color = TextSecondaryDark,
             textAlign = TextAlign.Center

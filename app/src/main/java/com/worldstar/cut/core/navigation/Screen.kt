@@ -67,11 +67,13 @@ sealed class Screen(val route: String) {
     }
 
     data class Export(val projectId: Long) :
-        Screen("export/{project_id}") {
+        Screen("export/{project_id}?is_image={is_image}") {
         companion object {
-            const val ROUTE = "export/{project_id}"
+            const val ROUTE = "export/{project_id}?is_image={is_image}"
             const val ARG_PROJECT_ID = "project_id"
-            fun createRoute(projectId: Long) = "export/$projectId"
+            const val ARG_IS_IMAGE = "is_image"
+            fun createRoute(projectId: Long, isImage: Boolean = false) =
+                "export/$projectId?is_image=$isImage"
         }
     }
 
