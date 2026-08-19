@@ -120,6 +120,14 @@ class VideoEditorViewModel @Inject constructor(
 
     fun onClipSelected(clipId: Long?) {
         _uiState.update { it.copy(selectedClipId = clipId) }
+        // Seek ExoPlayer to the selected clip's MediaItem index
+        if (clipId != null) {
+            val videoClips = _uiState.value.videoClips
+            val index = videoClips.indexOfFirst { it.id == clipId }
+            if (index >= 0 && index < player.mediaItemCount) {
+                player.seekToDefaultPosition(index)
+            }
+        }
     }
 
     // ─── Tools ────────────────────────────────────────────────────────────────
