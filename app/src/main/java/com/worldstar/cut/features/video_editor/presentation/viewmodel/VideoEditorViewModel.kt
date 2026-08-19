@@ -21,9 +21,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Timeline
 import androidx.media3.exoplayer.ExoPlayer
 
 @HiltViewModel
@@ -65,7 +67,7 @@ class VideoEditorViewModel @Inject constructor(
                     }
                     Player.STATE_ENDED -> {
                         stopPositionPolling()
-                        player.seekTo(0L)
+                        player.seekTo(0, 0L)
                         _uiState.update { it.copy(isPlaying = false, playbackPositionMs = 0L) }
                     }
                     Player.STATE_IDLE -> {}
@@ -76,6 +78,13 @@ class VideoEditorViewModel @Inject constructor(
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 _uiState.update { it.copy(isPlaying = isPlaying) }
                 if (isPlaying) startPositionPolling() else stopPositionPolling()
+            }
+
+            override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+                if (reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) {
+                    val dur = player.duration.coerceAtLeast(0L)
+                    _uiState.update { it.copy(totalDurationMs = dur) }
+                }
             }
 
             override fun onPlayerError(error: PlaybackException) {
@@ -233,6 +242,17 @@ class VideoEditorViewModel @Inject constructor(
     private fun preparePlayerMedia(uri: String) {
         val mediaItem = MediaItem.fromUri(Uri.parse(uri))
         player.setMediaItem(mediaItem)
+        player.prepare()
+    }
+
+    private fun prepareAllVideoClips(clips: List<Clip>) {
+        val videoClips = clips.filter { it.isVideo }
+        if (videoClips.isEmpty()) return
+        player.clearMediaItems()
+        val mediaItems = videoClips.map { clip ->
+            MediaItem.fromUri(Uri.parse(clip.mediaUri))
+        }
+        player.setMediaItems(mediaItems)
         player.prepare()
     }
 
