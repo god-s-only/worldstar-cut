@@ -21,6 +21,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -138,6 +140,7 @@ fun VideoEditorScreen(
                 isPlaying = uiState.isPlaying,
                 progress = uiState.playbackProgress,
                 clipText = uiState.selectedClip?.text,
+                effectType = uiState.selectedClip?.effectType,
                 onPlayPause = viewModel::onPlayPause,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -238,6 +241,7 @@ private fun VideoPreview(
     isPlaying: Boolean,
     progress: Float,
     clipText: String? = null,
+    effectType: String? = null,
     onPlayPause: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -252,11 +256,66 @@ private fun VideoPreview(
         if (uri != null) {
             if (isImage) {
                 // Static image preview using Coil
+                val colorFilter = remember(effectType) {
+                    when (effectType) {
+                        "B&W" -> ColorFilter.colorMatrix(ColorMatrix().apply {
+                            setToSaturation(0f)
+                        })
+                        "Noir" -> ColorFilter.colorMatrix(ColorMatrix().apply {
+                            setToSaturation(0f)
+                            val contrast = floatArrayOf(
+                                1.5f, 0f, 0f, 0f, -40f,
+                                0f, 1.5f, 0f, 0f, -40f,
+                                0f, 0f, 1.5f, 0f, -40f,
+                                0f, 0f, 0f, 1f, 0f
+                            )
+                            set(contrast)
+                        })
+                        "Vintage" -> ColorFilter.colorMatrix(ColorMatrix().apply {
+                            val vintage = floatArrayOf(
+                                0.6f, 0.3f, 0.1f, 0f, 20f,
+                                0.2f, 0.6f, 0.1f, 0f, 10f,
+                                0.1f, 0.2f, 0.5f, 0f, 5f,
+                                0f, 0f, 0f, 1f, 0f
+                            )
+                            set(vintage)
+                        })
+                        "Vivid" -> ColorFilter.colorMatrix(ColorMatrix().apply {
+                            val vivid = floatArrayOf(
+                                1.4f, 0f, 0f, 0f, 10f,
+                                0f, 1.4f, 0f, 0f, 10f,
+                                0f, 0f, 1.4f, 0f, 10f,
+                                0f, 0f, 0f, 1f, 0f
+                            )
+                            set(vivid)
+                        })
+                        "Cool" -> ColorFilter.colorMatrix(ColorMatrix().apply {
+                            val cool = floatArrayOf(
+                                0.9f, 0f, 0.1f, 0f, 0f,
+                                0f, 0.9f, 0.1f, 0f, 0f,
+                                0.1f, 0.1f, 1.2f, 0f, 15f,
+                                0f, 0f, 0f, 1f, 0f
+                            )
+                            set(cool)
+                        })
+                        "Warm" -> ColorFilter.colorMatrix(ColorMatrix().apply {
+                            val warm = floatArrayOf(
+                                1.2f, 0.1f, 0f, 0f, 15f,
+                                0f, 1.0f, 0f, 0f, 5f,
+                                0f, 0f, 0.8f, 0f, 0f,
+                                0f, 0f, 0f, 1f, 0f
+                            )
+                            set(warm)
+                        })
+                        else -> null
+                    }
+                }
                 coil.compose.AsyncImage(
                     model = uri,
                     contentDescription = "Image preview",
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit
+                    contentScale = ContentScale.Fit,
+                    colorFilter = colorFilter
                 )
             } else {
                 // Real ExoPlayer PlayerView
@@ -295,6 +354,26 @@ private fun VideoPreview(
                             )
                         }
                     }
+                }
+
+                // Effect tint overlay for video (ExoPlayer can't use ColorFilter directly)
+                val effectOverlayColor = remember(effectType) {
+                    when (effectType) {
+                        "Noir" -> Color.Black.copy(alpha = 0.15f)
+                        "Vintage" -> Color(0xFF8B6914).copy(alpha = 0.2f)
+                        "Vivid" -> Color(0x00000000).copy(alpha = 0f)
+                        "Cool" -> Color(0xFF1E90FF).copy(alpha = 0.12f)
+                        "Warm" -> Color(0xFFFF8C00).copy(alpha = 0.12f)
+                        "B&W" -> Color.Black.copy(alpha = 0.1f)
+                        else -> null
+                    }
+                }
+                if (effectOverlayColor != null && effectOverlayColor.alpha > 0f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(effectOverlayColor)
+                    )
                 }
             }
 
