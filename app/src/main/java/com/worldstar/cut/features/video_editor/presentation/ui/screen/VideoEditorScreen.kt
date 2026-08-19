@@ -137,6 +137,7 @@ fun VideoEditorScreen(
                 isImage = uiState.videoClips.firstOrNull()?.isImage == true,
                 isPlaying = uiState.isPlaying,
                 progress = uiState.playbackProgress,
+                clipText = uiState.selectedClip?.text,
                 onPlayPause = viewModel::onPlayPause,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -236,6 +237,7 @@ private fun VideoPreview(
     isImage: Boolean = false,
     isPlaying: Boolean,
     progress: Float,
+    clipText: String? = null,
     onPlayPause: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -293,6 +295,23 @@ private fun VideoPreview(
                             )
                         }
                     }
+                }
+            }
+
+            // Text overlay
+            if (!clipText.isNullOrBlank()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = clipText,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = Color.White,
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
         } else {
