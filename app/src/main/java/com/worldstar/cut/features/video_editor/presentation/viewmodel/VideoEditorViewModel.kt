@@ -302,7 +302,8 @@ class VideoEditorViewModel @Inject constructor(
                             val otherClips = state.clips.filter { it.trackId != track.id }
                             val newClips = otherClips + result.data
                             val totalDuration = newClips.maxOfOrNull { it.timelineStartMs + it.trimmedDurationMs } ?: 0L
-                            state.copy(clips = newClips, totalDurationMs = totalDuration)
+                            val autoSelect = if (state.selectedClipId == null && newClips.isNotEmpty()) newClips.first().id else state.selectedClipId
+                            state.copy(clips = newClips, totalDurationMs = totalDuration, selectedClipId = autoSelect)
                         }
                         // Auto-prepare first video clip in player
                         if (track.type == "video" && result.data.isNotEmpty()) {
