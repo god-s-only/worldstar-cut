@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -141,6 +142,9 @@ fun VideoEditorScreen(
                 progress = uiState.playbackProgress,
                 clipText = uiState.selectedClip?.text,
                 effectType = uiState.selectedClip?.effectType,
+                isTransitioning = uiState.isTransitioning,
+                transitionProgress = uiState.transitionProgress,
+                nextClipUri = uiState.videoClips.getOrNull(uiState.currentPlayingClipIndex + 1)?.mediaUri,
                 onPlayPause = viewModel::onPlayPause,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -243,6 +247,9 @@ private fun VideoPreview(
     progress: Float,
     clipText: String? = null,
     effectType: String? = null,
+    isTransitioning: Boolean = false,
+    transitionProgress: Float = 0f,
+    nextClipUri: String? = null,
     onPlayPause: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -387,6 +394,18 @@ private fun VideoPreview(
                         textAlign = TextAlign.Center
                     )
                 }
+            }
+
+            // Cross-fade transition overlay
+            if (isTransitioning && nextClipUri != null) {
+                coil.compose.AsyncImage(
+                    model = nextClipUri,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { alpha = transitionProgress },
+                    contentScale = ContentScale.Fit
+                )
             }
         } else {
             // No media loaded state
