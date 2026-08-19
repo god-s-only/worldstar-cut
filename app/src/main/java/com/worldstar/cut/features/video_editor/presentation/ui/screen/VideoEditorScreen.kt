@@ -45,6 +45,8 @@ import com.worldstar.cut.features.video_editor.presentation.viewmodel.EditorTool
 import com.worldstar.cut.features.video_editor.presentation.viewmodel.VideoEditorEvent
 import com.worldstar.cut.features.video_editor.presentation.viewmodel.VideoEditorViewModel
 import kotlin.math.roundToInt
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,6 +65,13 @@ fun VideoEditorScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
     val currentBackStackEntry = navController?.currentBackStackEntryAsState()?.value
+
+    // Audio file picker launcher
+    val audioPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { viewModel.onAudioAdded(it.toString()) }
+    }
 
     // Observe added media from media picker
     LaunchedEffect(currentBackStackEntry) {
@@ -139,7 +148,7 @@ fun VideoEditorScreen(
                 activeTool = uiState.activeTool,
                 onToolSelected = viewModel::onToolSelected,
                 onAudioClick = {
-                    uiState.project?.let { onAudioClick(it.id) }
+                    audioPickerLauncher.launch("audio/*")
                 },
                 hasSelection = uiState.selectedClipId != null
             )
