@@ -186,7 +186,8 @@ class VideoEditorViewModel @Inject constructor(
         positionPollingJob?.cancel()
         positionPollingJob = viewModelScope.launch {
             while (player.isPlaying) {
-                _uiState.update { it.copy(playbackPositionMs = player.currentPosition) }
+                val pos = player.currentPosition.coerceAtMost(player.duration)
+                _uiState.update { it.copy(playbackPositionMs = pos) }
                 delay(100)
             }
         }
