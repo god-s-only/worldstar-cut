@@ -171,7 +171,11 @@ class TrackClipRepositoryImpl @Inject constructor(
         cropX = cropX,
         cropY = cropY,
         cropW = cropW,
-        cropH = cropH
+        cropH = cropH,
+        textPosX = textPosX,
+        textPosY = textPosY,
+        textSizeSp = textSizeSp,
+        textRotation = textRotation
     )
 
     private fun Clip.toEntity() = ClipEntity(
@@ -198,6 +202,10 @@ class TrackClipRepositoryImpl @Inject constructor(
         cropX = cropX,
         cropY = cropY,
         cropW = cropW,
-        cropH = cropH
+        cropH = cropH,
+        textPosX = textPosX,
+        textPosY = textPosY,
+        textSizeSp = textSizeSp,
+        textRotation = textRotation
     )
 }

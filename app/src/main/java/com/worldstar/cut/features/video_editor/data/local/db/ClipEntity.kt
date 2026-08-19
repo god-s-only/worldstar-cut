@@ -42,5 +42,9 @@ data class ClipEntity(
     val cropX: Float = 0f,
     val cropY: Float = 0f,
     val cropW: Float = 1f,
-    val cropH: Float = 1f
+    val cropH: Float = 1f,
+    val textPosX: Float = 0.5f,
+    val textPosY: Float = 0.5f,
+    val textSizeSp: Float = 24f,
+    val textRotation: Float = 0f
 )
