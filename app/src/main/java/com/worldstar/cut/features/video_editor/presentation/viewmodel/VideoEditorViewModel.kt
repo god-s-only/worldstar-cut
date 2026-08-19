@@ -11,8 +11,8 @@ import com.worldstar.cut.features.video_editor.domain.model.Clip
 import com.worldstar.cut.features.video_editor.domain.model.Track
 import com.worldstar.cut.features.video_editor.domain.tracking.MotionTracker
 import com.worldstar.cut.features.video_editor.domain.usecase.*
-import parseTextOverlays
-import serializeTextOverlays
+import com.worldstar.cut.features.video_editor.presentation.ui.screen.parseTextOverlays
+import com.worldstar.cut.features.video_editor.presentation.ui.screen.serializeTextOverlays
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -317,7 +317,7 @@ class VideoEditorViewModel @Inject constructor(
                 )
 
                 if (result.status == "completed" || result.frames.isNotEmpty()) {
-                    val trackJson = com.google.gson.Gson().toJson(result)
+                    val trackJson = Gson().toJson(result)
                     updateClipUseCase(clip.copy(motionTrack = trackJson))
                 }
             } catch (_: Exception) {
