@@ -5,6 +5,7 @@ data class Clip(
     val trackId: Long,
     val mediaUri: String,
     val mediaPath: String = "",
+    val mediaType: String = "video",
     val startMs: Long = 0,
     val endMs: Long = 0,
     val trimStartMs: Long = 0,
@@ -22,6 +23,8 @@ data class Clip(
     val trimmedDurationMs: Long
         get() = (endMs - startMs) - (trimStartMs + trimEndMs)
 
+    val isVideo: Boolean get() = mediaType == "video"
+    val isImage: Boolean get() = mediaType == "image"
     val hasText: Boolean get() = !text.isNullOrBlank()
     val hasEffect: Boolean get() = effectType != null
 }
