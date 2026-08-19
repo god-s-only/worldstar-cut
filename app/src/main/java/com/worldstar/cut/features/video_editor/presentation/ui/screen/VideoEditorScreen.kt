@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntOffset
@@ -1081,6 +1082,7 @@ private fun DraggableText(
     var offset by remember { mutableStateOf(Offset(posX, posY)) }
     var scale by remember { mutableFloatStateOf(sizeSp / 24f) }
     var angle by remember { mutableFloatStateOf(rotation) }
+    var containerSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize(1, 1)) }
 
     val textFontFamily = remember(fontFamilyName) {
         when (fontFamilyName) {
@@ -1099,15 +1101,17 @@ private fun DraggableText(
     }
 
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .onSizeChanged { containerSize = it },
         contentAlignment = Alignment.Center
     ) {
         Box(
             modifier = Modifier
                 .offset {
                     IntOffset(
-                        x = ((offset.x - 0.5f) * size.width).roundToInt(),
-                        y = ((offset.y - 0.5f) * size.height).roundToInt()
+                        x = ((offset.x - 0.5f) * containerSize.width).roundToInt(),
+                        y = ((offset.y - 0.5f) * containerSize.height).roundToInt()
                     )
                 }
                 .graphicsLayer {
@@ -1117,8 +1121,8 @@ private fun DraggableText(
                 }
                 .pointerInput(Unit) {
                     detectTransformGestures { _, pan, zoom, rotation ->
-                        val newX = (offset.x + pan.x / size.width).coerceIn(0f, 1f)
-                        val newY = (offset.y + pan.y / size.height).coerceIn(0f, 1f)
+                        val newX = (offset.x + pan.x / containerSize.width).coerceIn(0f, 1f)
+                        val newY = (offset.y + pan.y / containerSize.height).coerceIn(0f, 1f)
                         offset = Offset(newX, newY)
                         scale = (scale * zoom).coerceIn(0.3f, 4f)
                         angle = (angle + rotation) % 360f
