@@ -138,6 +138,9 @@ fun VideoEditorScreen(
             EditorToolsBar(
                 activeTool = uiState.activeTool,
                 onToolSelected = viewModel::onToolSelected,
+                onAudioClick = {
+                    uiState.project?.let { onAudioClick(it.id) }
+                },
                 hasSelection = uiState.selectedClipId != null
             )
 
@@ -278,11 +281,26 @@ private fun VideoPreview(
                                 contentDescription = "Play",
                                 tint = Color.White,
                                 modifier = Modifier.size(32.dp)
-                            )
-                        }
-                    }
-                }
+                )
             }
+        }
+
+        // Audio button (navigates to audio editor)
+        IconButton(
+            onClick = onAudioClick,
+            modifier = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(12.dp))
+        ) {
+            Icon(
+                imageVector = Icons.Filled.MusicNote,
+                contentDescription = "Audio",
+                tint = WorldstarCyan,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+    }
+}
         } else {
             // No media loaded state
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -327,6 +345,7 @@ private fun VideoPreview(
 private fun EditorToolsBar(
     activeTool: EditorTool,
     onToolSelected: (EditorTool) -> Unit,
+    onAudioClick: () -> Unit,
     hasSelection: Boolean
 ) {
     val tools = listOf(
