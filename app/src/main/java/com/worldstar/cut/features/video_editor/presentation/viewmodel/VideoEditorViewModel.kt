@@ -185,6 +185,13 @@ class VideoEditorViewModel @Inject constructor(
         }
     }
 
+    fun onClipTransitionChanged(transition: String?) {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            updateClipUseCase(clip.copy(transitionType = transition))
+        }
+    }
+
     fun onDeleteClip() {
         val clip = _uiState.value.selectedClip ?: return
         viewModelScope.launch {

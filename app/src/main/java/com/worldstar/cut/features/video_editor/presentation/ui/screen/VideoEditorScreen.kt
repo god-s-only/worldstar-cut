@@ -172,6 +172,7 @@ fun VideoEditorScreen(
                     onSpeedChanged = viewModel::onClipSpeedChanged,
                     onTextChanged = viewModel::onClipTextChanged,
                     onEffectChanged = viewModel::onClipEffectChanged,
+                    onTransitionChanged = viewModel::onClipTransitionChanged,
                     onDelete = viewModel::onDeleteClip
                 )
             }
@@ -438,6 +439,7 @@ private fun EditorToolsBar(
         EditorTool.Trim to Icons.Filled.ContentCut,
         EditorTool.Text to Icons.Filled.TextFields,
         EditorTool.Effects to Icons.Filled.AutoFixHigh,
+        EditorTool.Transition to Icons.Filled.SyncAlt,
         EditorTool.Speed to Icons.Filled.Speed,
         EditorTool.Volume to Icons.Filled.VolumeUp,
         EditorTool.Adjust to Icons.Filled.Tune
@@ -455,7 +457,8 @@ private fun EditorToolsBar(
             val isActive = activeTool == tool
             val enabled = when (tool) {
                 EditorTool.Trim, EditorTool.Text, EditorTool.Effects,
-                EditorTool.Speed, EditorTool.Volume, EditorTool.Adjust -> hasSelection
+                EditorTool.Speed, EditorTool.Volume, EditorTool.Adjust,
+                EditorTool.Transition -> hasSelection
                 else -> true
             }
 
@@ -512,6 +515,7 @@ private fun ToolPanel(
     onSpeedChanged: (Float) -> Unit,
     onTextChanged: (String) -> Unit,
     onEffectChanged: (String?) -> Unit,
+    onTransitionChanged: (String?) -> Unit,
     onDelete: () -> Unit
 ) {
     Surface(
@@ -533,6 +537,10 @@ private fun ToolPanel(
                 EditorTool.Effects -> EffectsTool(
                     clip = selectedClip,
                     onEffectChanged = onEffectChanged
+                )
+                EditorTool.Transition -> TransitionTool(
+                    clip = selectedClip,
+                    onTransitionChanged = onTransitionChanged
                 )
                 EditorTool.Speed -> SpeedTool(
                     clip = selectedClip,
@@ -644,6 +652,38 @@ private fun EffectsTool(
                         onEffectChanged(if (effect == "None") null else effect)
                     },
                     label = { Text(effect, style = MaterialTheme.typography.labelSmall) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = WorldstarPurpleLight,
+                        selectedLabelColor = Color.White,
+                        containerColor = SurfaceDark,
+                        labelColor = TextSecondaryDark
+                    )
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TransitionTool(
+    clip: Clip?,
+    onTransitionChanged: (String?) -> Unit
+) {
+    val transitions = listOf("None", "Fade", "Crossfade", "Dissolve", "Wipe", "Slide Left", "Slide Right")
+    val currentTransition = clip?.transitionType ?: "None"
+
+    Column {
+        Text("Transition", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
+        Spacer(Modifier.height(12.dp))
+
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(transitions) { transition ->
+                FilterChip(
+                    selected = currentTransition == transition,
+                    onClick = {
+                        onTransitionChanged(if (transition == "None") null else transition)
+                    },
+                    label = { Text(transition, style = MaterialTheme.typography.labelSmall) },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = WorldstarPurpleLight,
                         selectedLabelColor = Color.White,

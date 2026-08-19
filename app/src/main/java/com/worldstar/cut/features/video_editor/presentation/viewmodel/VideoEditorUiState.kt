@@ -46,5 +46,5 @@ data class VideoEditorUiState(
 }
 
 enum class EditorTool {
-    None, Trim, Text, Effects, Speed, Volume, Adjust
+    None, Trim, Text, Effects, Speed, Volume, Adjust, Transition
 }
