@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -725,7 +726,9 @@ private fun TextTool(
         "Cursive" to "cursive"
     )
 
-    Column {
+    Column(
+        modifier = Modifier.verticalScroll(rememberScrollState())
+    ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
@@ -763,7 +766,7 @@ private fun TextTool(
         }
 
         if (selectedOverlay != null) {
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(16.dp))
             OutlinedTextField(
                 value = editText,
                 onValueChange = { editText = it; onOverlayUpdate(selectedOverlay.id, it, editColor.intValue, editFont.value) },
@@ -780,20 +783,23 @@ private fun TextTool(
                 maxLines = 3
             )
 
-            Spacer(Modifier.height(16.dp))
-            Text("Color", style = MaterialTheme.typography.labelMedium, color = TextSecondaryDark)
-            Spacer(Modifier.height(8.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Spacer(Modifier.height(20.dp))
+            Text("Color", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
+            Spacer(Modifier.height(10.dp))
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp)
+            ) {
                 items(colorOptions) { (_, colorInt) ->
                     val isSelected = editColor.intValue == colorInt
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(44.dp)
                             .clip(CircleShape)
                             .background(Color(colorInt))
                             .then(
                                 if (isSelected) Modifier.border(3.dp, WorldstarCyan, CircleShape)
-                                else Modifier.border(1.dp, TextDisabledDark, CircleShape)
+                                else Modifier.border(2.dp, TextDisabledDark.copy(alpha = 0.4f), CircleShape)
                             )
                             .clickable {
                                 editColor.intValue = colorInt
@@ -803,10 +809,13 @@ private fun TextTool(
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
-            Text("Font", style = MaterialTheme.typography.labelMedium, color = TextSecondaryDark)
-            Spacer(Modifier.height(8.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Spacer(Modifier.height(20.dp))
+            Text("Font", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
+            Spacer(Modifier.height(10.dp))
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp)
+            ) {
                 items(fontOptions) { (name, fontKey) ->
                     val isSelected = editFont.value == fontKey
                     FilterChip(
@@ -815,7 +824,7 @@ private fun TextTool(
                             editFont.value = fontKey
                             onOverlayUpdate(selectedOverlay.id, editText, editColor.intValue, fontKey)
                         },
-                        label = { Text(name, style = MaterialTheme.typography.labelSmall) },
+                        label = { Text(name, style = MaterialTheme.typography.labelMedium) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = WorldstarPurpleLight,
                             selectedLabelColor = Color.White,
@@ -1140,6 +1149,7 @@ private fun DraggableText(
     var scale by remember { mutableFloatStateOf(sizeSp / 24f) }
     var angle by remember { mutableFloatStateOf(rotation) }
     var containerSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize(1, 1)) }
+    var textBoxSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize(0, 0)) }
 
     val textFontFamily = remember(fontFamilyName) {
         when (fontFamilyName) {
@@ -1163,6 +1173,7 @@ private fun DraggableText(
             .onSizeChanged { containerSize = it },
         contentAlignment = Alignment.Center
     ) {
+        // Measured text box — we measure this to position handles at its actual border
         Box(
             modifier = Modifier
                 .offset {
@@ -1187,12 +1198,13 @@ private fun DraggableText(
                         onTransformChanged(overlayId, newX, newY, scale * 24f, angle)
                     }
                 }
+                .onSizeChanged { textBoxSize = it }
                 .then(
                     if (isSelected) Modifier.border(2.dp, WorldstarCyan, RoundedCornerShape(6.dp))
                     else Modifier
                 )
                 .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
-                .padding(horizontal = 12.dp, vertical = 6.dp)
+                .padding(horizontal = 10.dp, vertical = 4.dp)
         ) {
             Text(
                 text = text,
@@ -1210,10 +1222,12 @@ private fun DraggableText(
             )
         }
 
-        // Resize handles (4 corners) — only visible when selected
+        // Resize handles (4 corners) — positioned at the actual text box border
         if (isSelected) {
-            val handleSize = 12.dp
-            val handleTouchSize = 36.dp
+            val handleVisualSize = 10.dp
+            val handleTouchSize = 40.dp
+            val halfW = textBoxSize.width / 2
+            val halfH = textBoxSize.height / 2
             val corners = listOf(
                 Alignment.TopStart to Offset(-1f, -1f),
                 Alignment.TopEnd to Offset(1f, -1f),
@@ -1223,16 +1237,18 @@ private fun DraggableText(
             corners.forEach { (alignment, direction) ->
                 Box(
                     modifier = Modifier
-                        .align(alignment)
                         .offset {
                             IntOffset(
-                                x = ((offset.x - 0.5f) * containerSize.width).roundToInt() + (direction.x * 40f * scale).roundToInt(),
-                                y = ((offset.y - 0.5f) * containerSize.height).roundToInt() + (direction.y * 20f * scale).roundToInt()
+                                x = ((offset.x - 0.5f) * containerSize.width).roundToInt() +
+                                        (direction.x * halfW).roundToInt(),
+                                y = ((offset.y - 0.5f) * containerSize.height).roundToInt() +
+                                        (direction.y * halfH).roundToInt()
                             )
                         }
                         .size(handleTouchSize)
                         .pointerInput(overlayId, direction) {
                             detectTransformGestures { _, pan, _, _ ->
+                                onSelect(overlayId)
                                 val scaleXDelta = pan.x / (containerSize.width * 0.5f)
                                 val scaleYDelta = pan.y / (containerSize.height * 0.5f)
                                 val avgDelta = (scaleXDelta * direction.x + scaleYDelta * direction.y) / 2f
@@ -1244,7 +1260,7 @@ private fun DraggableText(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(handleSize)
+                            .size(handleVisualSize)
                             .background(Color.White, CircleShape)
                             .border(2.dp, WorldstarCyan, CircleShape)
                     )

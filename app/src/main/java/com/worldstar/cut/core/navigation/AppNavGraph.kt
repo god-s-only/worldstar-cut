@@ -1,5 +1,7 @@
 package com.worldstar.cut.core.navigation
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
@@ -16,6 +18,8 @@ import com.worldstar.cut.features.audio.presentation.ui.screen.AudioEditorScreen
 import com.worldstar.cut.features.filters_effects.presentation.ui.screen.FiltersEffectsScreen
 import com.worldstar.cut.features.text_sticker.presentation.ui.screen.TextStickerScreen
 
+private const val SLIDE_DURATION = 300
+
 @Composable
 fun AppNavGraph(
     navController: NavHostController,
@@ -24,7 +28,31 @@ fun AppNavGraph(
     NavHost(
         navController = navController,
         startDestination = Screen.Home.route,
-        modifier = modifier
+        modifier = modifier,
+        enterTransition = {
+            slideInHorizontally(
+                initialOffsetX = { it },
+                animationSpec = tween(SLIDE_DURATION)
+            ) + fadeIn(animationSpec = tween(SLIDE_DURATION))
+        },
+        exitTransition = {
+            slideOutHorizontally(
+                targetOffsetX = { -it / 3 },
+                animationSpec = tween(SLIDE_DURATION)
+            ) + fadeOut(animationSpec = tween(SLIDE_DURATION / 2))
+        },
+        popEnterTransition = {
+            slideInHorizontally(
+                initialOffsetX = { -it / 3 },
+                animationSpec = tween(SLIDE_DURATION)
+            ) + fadeIn(animationSpec = tween(SLIDE_DURATION))
+        },
+        popExitTransition = {
+            slideOutHorizontally(
+                targetOffsetX = { it },
+                animationSpec = tween(SLIDE_DURATION)
+            ) + fadeOut(animationSpec = tween(SLIDE_DURATION / 2))
+        }
     ) {
 
         composable(route = Screen.Home.route) {
