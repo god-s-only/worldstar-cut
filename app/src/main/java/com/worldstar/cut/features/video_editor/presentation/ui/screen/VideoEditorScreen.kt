@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -158,6 +159,8 @@ fun VideoEditorScreen(
                 textPosY = uiState.selectedClip?.textPosY ?: 0.5f,
                 textSizeSp = uiState.selectedClip?.textSizeSp ?: 24f,
                 textRotation = uiState.selectedClip?.textRotation ?: 0f,
+                textColor = uiState.selectedClip?.textColor ?: Color.White.hashCode(),
+                fontFamilyName = uiState.selectedClip?.fontFamily ?: "default",
                 isTransitioning = uiState.isTransitioning,
                 transitionProgress = uiState.transitionProgress,
                 nextClipUri = uiState.videoClips.getOrNull(uiState.currentPlayingClipIndex + 1)?.mediaUri,
@@ -192,6 +195,8 @@ fun VideoEditorScreen(
                     onVolumeChanged = viewModel::onClipVolumeChanged,
                     onSpeedChanged = viewModel::onClipSpeedChanged,
                     onTextChanged = viewModel::onClipTextChanged,
+                    onTextColorChanged = viewModel::onClipTextColorChanged,
+                    onFontChanged = viewModel::onClipFontChanged,
                     onEffectChanged = viewModel::onClipEffectChanged,
                     onTransitionChanged = viewModel::onClipTransitionChanged,
                     onCropChanged = viewModel::onClipCropChanged,
@@ -273,6 +278,8 @@ private fun VideoPreview(
     textPosY: Float = 0.5f,
     textSizeSp: Float = 24f,
     textRotation: Float = 0f,
+    textColor: Int = Color.White.hashCode(),
+    fontFamilyName: String = "default",
     isTransitioning: Boolean = false,
     transitionProgress: Float = 0f,
     nextClipUri: String? = null,
@@ -432,6 +439,8 @@ private fun VideoPreview(
                     posY = textPosY,
                     sizeSp = textSizeSp,
                     rotation = textRotation,
+                    color = textColor,
+                    fontFamilyName = fontFamilyName,
                     onTransformChanged = onTextTransformChanged
                 )
             }
@@ -574,6 +583,8 @@ private fun ToolPanel(
     onVolumeChanged: (Float) -> Unit,
     onSpeedChanged: (Float) -> Unit,
     onTextChanged: (String) -> Unit,
+    onTextColorChanged: (Int) -> Unit,
+    onFontChanged: (String) -> Unit,
     onEffectChanged: (String?) -> Unit,
     onTransitionChanged: (String?) -> Unit,
     onCropChanged: (Float, Float, Float, Float) -> Unit,
@@ -593,7 +604,9 @@ private fun ToolPanel(
                 )
                 EditorTool.Text -> TextTool(
                     clip = selectedClip,
-                    onTextChanged = onTextChanged
+                    onTextChanged = onTextChanged,
+                    onTextColorChanged = onTextColorChanged,
+                    onFontChanged = onFontChanged
                 )
                 EditorTool.Effects -> EffectsTool(
                     clip = selectedClip,
@@ -672,9 +685,34 @@ private fun TrimTool(
 @Composable
 private fun TextTool(
     clip: Clip?,
-    onTextChanged: (String) -> Unit
+    onTextChanged: (String) -> Unit,
+    onTextColorChanged: (Int) -> Unit,
+    onFontChanged: (String) -> Unit
 ) {
     var text by remember(clip) { mutableStateOf(clip?.text ?: "") }
+    val selectedColor = remember(clip) { mutableIntStateOf(clip?.textColor ?: Color.White.hashCode()) }
+    val selectedFont = remember(clip) { mutableStateOf(clip?.fontFamily ?: "default") }
+
+    val colorOptions = listOf(
+        "White" to Color.White.hashCode(),
+        "Black" to Color.Black.hashCode(),
+        "Red" to Color.Red.hashCode(),
+        "Yellow" to Color.Yellow.hashCode(),
+        "Cyan" to Color.Cyan.hashCode(),
+        "Magenta" to Color.Magenta.hashCode(),
+        "Green" to Color(0xFF00FF00).hashCode(),
+        "Blue" to Color.Blue.hashCode(),
+        "Orange" to Color(0xFFFFA500).hashCode(),
+        "Purple" to Color(0xFF9D4EDD).hashCode()
+    )
+
+    val fontOptions = listOf(
+        "Default" to "default",
+        "Serif" to "serif",
+        "Sans Serif" to "sans-serif",
+        "Monospace" to "monospace",
+        "Cursive" to "cursive"
+    )
 
     Column {
         Text("Add Text", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
@@ -694,6 +732,52 @@ private fun TextTool(
             shape = RoundedCornerShape(12.dp),
             maxLines = 3
         )
+
+        Spacer(Modifier.height(16.dp))
+        Text("Color", style = MaterialTheme.typography.labelMedium, color = TextSecondaryDark)
+        Spacer(Modifier.height(8.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(colorOptions) { (name, colorInt) ->
+                val isSelected = selectedColor.intValue == colorInt
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(Color(colorInt))
+                        .then(
+                            if (isSelected) Modifier.border(3.dp, WorldstarCyan, CircleShape)
+                            else Modifier.border(1.dp, TextDisabledDark, CircleShape)
+                        )
+                        .clickable {
+                            selectedColor.intValue = colorInt
+                            onTextColorChanged(colorInt)
+                        }
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+        Text("Font", style = MaterialTheme.typography.labelMedium, color = TextSecondaryDark)
+        Spacer(Modifier.height(8.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(fontOptions) { (name, fontKey) ->
+                val isSelected = selectedFont.value == fontKey
+                FilterChip(
+                    selected = isSelected,
+                    onClick = {
+                        selectedFont.value = fontKey
+                        onFontChanged(fontKey)
+                    },
+                    label = { Text(name, style = MaterialTheme.typography.labelSmall) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = WorldstarPurpleLight,
+                        selectedLabelColor = Color.White,
+                        containerColor = SurfaceDark,
+                        labelColor = TextSecondaryDark
+                    )
+                )
+            }
+        }
     }
 }
 
@@ -990,13 +1074,24 @@ private fun DraggableText(
     posY: Float,
     sizeSp: Float,
     rotation: Float,
+    color: Int = Color.White.hashCode(),
+    fontFamilyName: String = "default",
     onTransformChanged: (Float, Float, Float, Float) -> Unit
 ) {
     var offset by remember { mutableStateOf(Offset(posX, posY)) }
     var scale by remember { mutableFloatStateOf(sizeSp / 24f) }
     var angle by remember { mutableFloatStateOf(rotation) }
 
-    // Sync from clip state when it changes externally
+    val textFontFamily = remember(fontFamilyName) {
+        when (fontFamilyName) {
+            "serif" -> FontFamily.Serif
+            "sans-serif" -> FontFamily.SansSerif
+            "monospace" -> FontFamily.Monospace
+            "cursive" -> FontFamily.Cursive
+            else -> FontFamily.Default
+        }
+    }
+
     LaunchedEffect(posX, posY, sizeSp, rotation) {
         offset = Offset(posX, posY)
         scale = sizeSp / 24f
@@ -1036,7 +1131,8 @@ private fun DraggableText(
             Text(
                 text = text,
                 fontSize = (24 * scale).sp,
-                color = Color.White,
+                color = Color(color),
+                fontFamily = textFontFamily,
                 textAlign = TextAlign.Center,
                 style = TextStyle(
                     shadow = Shadow(
