@@ -212,6 +212,11 @@ class VideoEditorViewModel @Inject constructor(
                     order = clipCount
                 )
             )
+            // Add video clip to ExoPlayer playlist
+            if (!isImage) {
+                player.addMediaItem(MediaItem.fromUri(Uri.parse(mediaUri)))
+                if (player.playbackState == Player.STATE_IDLE) player.prepare()
+            }
         }
     }
 
