@@ -192,6 +192,13 @@ class VideoEditorViewModel @Inject constructor(
         }
     }
 
+    fun onClipCropChanged(x: Float, y: Float, w: Float, h: Float) {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            updateClipUseCase(clip.copy(cropX = x, cropY = y, cropW = w, cropH = h))
+        }
+    }
+
     fun onDeleteClip() {
         val clip = _uiState.value.selectedClip ?: return
         viewModelScope.launch {

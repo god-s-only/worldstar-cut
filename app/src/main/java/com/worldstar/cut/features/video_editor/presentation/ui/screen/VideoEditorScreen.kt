@@ -2,6 +2,7 @@ package com.worldstar.cut.features.video_editor.presentation.ui.screen
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
@@ -177,6 +178,7 @@ fun VideoEditorScreen(
                     onTextChanged = viewModel::onClipTextChanged,
                     onEffectChanged = viewModel::onClipEffectChanged,
                     onTransitionChanged = viewModel::onClipTransitionChanged,
+                    onCropChanged = viewModel::onClipCropChanged,
                     onDelete = viewModel::onDeleteClip
                 )
             }
@@ -459,6 +461,7 @@ private fun EditorToolsBar(
         EditorTool.Text to Icons.Filled.TextFields,
         EditorTool.Effects to Icons.Filled.AutoFixHigh,
         EditorTool.Transition to Icons.Filled.SyncAlt,
+        EditorTool.Crop to Icons.Filled.Crop,
         EditorTool.Speed to Icons.Filled.Speed,
         EditorTool.Volume to Icons.Filled.VolumeUp,
         EditorTool.Adjust to Icons.Filled.Tune
@@ -477,7 +480,7 @@ private fun EditorToolsBar(
             val enabled = when (tool) {
                 EditorTool.Trim, EditorTool.Text, EditorTool.Effects,
                 EditorTool.Speed, EditorTool.Volume, EditorTool.Adjust,
-                EditorTool.Transition -> hasSelection
+                EditorTool.Transition, EditorTool.Crop -> hasSelection
                 else -> true
             }
 
@@ -535,6 +538,7 @@ private fun ToolPanel(
     onTextChanged: (String) -> Unit,
     onEffectChanged: (String?) -> Unit,
     onTransitionChanged: (String?) -> Unit,
+    onCropChanged: (Float, Float, Float, Float) -> Unit,
     onDelete: () -> Unit
 ) {
     Surface(
@@ -560,6 +564,10 @@ private fun ToolPanel(
                 EditorTool.Transition -> TransitionTool(
                     clip = selectedClip,
                     onTransitionChanged = onTransitionChanged
+                )
+                EditorTool.Crop -> CropTool(
+                    clip = selectedClip,
+                    onCropChanged = onCropChanged
                 )
                 EditorTool.Speed -> SpeedTool(
                     clip = selectedClip,
@@ -711,6 +719,117 @@ private fun TransitionTool(
                     )
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun CropTool(
+    clip: Clip?,
+    onCropChanged: (Float, Float, Float, Float) -> Unit
+) {
+    var cropX by remember(clip) { mutableFloatStateOf(clip?.cropX ?: 0f) }
+    var cropY by remember(clip) { mutableFloatStateOf(clip?.cropY ?: 0f) }
+    var cropW by remember(clip) { mutableFloatStateOf(clip?.cropW ?: 1f) }
+    var cropH by remember(clip) { mutableFloatStateOf(clip?.cropH ?: 1f) }
+
+    Column {
+        Text("Crop", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
+        Spacer(Modifier.height(12.dp))
+
+        // Preview box showing crop region
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(SurfaceDark),
+            contentAlignment = Alignment.Center
+        ) {
+            // Full frame outline
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(8.dp)
+                    .border(1.dp, TextDisabledDark, RoundedCornerShape(4.dp))
+            )
+            // Crop region highlight
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(fraction = cropW.coerceIn(0.1f, 1f))
+                    .fillMaxHeight(fraction = cropH.coerceIn(0.1f, 1f))
+                    .offset(
+                        x = (cropX * 200f).dp,
+                        y = (cropY * 100f).dp
+                    )
+                    .border(2.dp, WorldstarCyan, RoundedCornerShape(4.dp))
+                    .background(WorldstarCyan.copy(alpha = 0.15f))
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // X position
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("X", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark, modifier = Modifier.width(20.dp))
+            Slider(
+                value = cropX,
+                onValueChange = { cropX = it; onCropChanged(cropX, cropY, cropW, cropH) },
+                valueRange = 0f..0.9f,
+                modifier = Modifier.weight(1f),
+                colors = SliderDefaults.colors(thumbColor = WorldstarCyan, activeTrackColor = WorldstarCyan)
+            )
+            Text("${(cropX * 100).roundToInt()}%", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark, modifier = Modifier.width(36.dp))
+        }
+
+        // Y position
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Y", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark, modifier = Modifier.width(20.dp))
+            Slider(
+                value = cropY,
+                onValueChange = { cropY = it; onCropChanged(cropX, cropY, cropW, cropH) },
+                valueRange = 0f..0.9f,
+                modifier = Modifier.weight(1f),
+                colors = SliderDefaults.colors(thumbColor = WorldstarCyan, activeTrackColor = WorldstarCyan)
+            )
+            Text("${(cropY * 100).roundToInt()}%", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark, modifier = Modifier.width(36.dp))
+        }
+
+        // Width
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("W", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark, modifier = Modifier.width(20.dp))
+            Slider(
+                value = cropW,
+                onValueChange = { cropW = it; onCropChanged(cropX, cropY, cropW, cropH) },
+                valueRange = 0.1f..1f,
+                modifier = Modifier.weight(1f),
+                colors = SliderDefaults.colors(thumbColor = WorldstarCyan, activeTrackColor = WorldstarCyan)
+            )
+            Text("${(cropW * 100).roundToInt()}%", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark, modifier = Modifier.width(36.dp))
+        }
+
+        // Height
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("H", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark, modifier = Modifier.width(20.dp))
+            Slider(
+                value = cropH,
+                onValueChange = { cropH = it; onCropChanged(cropX, cropY, cropW, cropH) },
+                valueRange = 0.1f..1f,
+                modifier = Modifier.weight(1f),
+                colors = SliderDefaults.colors(thumbColor = WorldstarCyan, activeTrackColor = WorldstarCyan)
+            )
+            Text("${(cropH * 100).roundToInt()}%", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark, modifier = Modifier.width(36.dp))
+        }
+
+        // Reset button
+        OutlinedButton(
+            onClick = {
+                cropX = 0f; cropY = 0f; cropW = 1f; cropH = 1f
+                onCropChanged(0f, 0f, 1f, 1f)
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Reset Crop")
         }
     }
 }
