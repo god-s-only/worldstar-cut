@@ -26,7 +26,7 @@ import com.worldstar.cut.features.export.data.local.db.ExportHistoryEntity
         ClipEntity::class,
         ExportHistoryEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 @TypeConverters(RoomTypeConverters::class)
@@ -50,6 +50,15 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE clips ADD COLUMN transitionType TEXT DEFAULT NULL")
                 db.execSQL("ALTER TABLE clips ADD COLUMN transitionDurationMs INTEGER NOT NULL DEFAULT 500")
+            }
+        }
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE clips ADD COLUMN cropX REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE clips ADD COLUMN cropY REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE clips ADD COLUMN cropW REAL NOT NULL DEFAULT 1.0")
+                db.execSQL("ALTER TABLE clips ADD COLUMN cropH REAL NOT NULL DEFAULT 1.0")
             }
         }
     }

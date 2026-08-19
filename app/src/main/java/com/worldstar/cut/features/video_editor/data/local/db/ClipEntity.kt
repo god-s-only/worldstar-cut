@@ -38,5 +38,9 @@ data class ClipEntity(
     val textSize: Float? = null,
     val effectType: String? = null,
     val transitionType: String? = null,
-    val transitionDurationMs: Long = 500L
+    val transitionDurationMs: Long = 500L,
+    val cropX: Float = 0f,
+    val cropY: Float = 0f,
+    val cropW: Float = 1f,
+    val cropH: Float = 1f
 )
