@@ -18,7 +18,8 @@ data class VideoEditorUiState(
     val errorMessage: String? = null,
     val currentPlayingClipIndex: Int = 0,
     val transitionProgress: Float = 0f,
-    val isTransitioning: Boolean = false
+    val isTransitioning: Boolean = false,
+    val selectedTextOverlayId: Long? = null
 ) {
     val selectedClip: Clip?
         get() = clips.find { it.id == selectedClipId }

@@ -220,6 +220,55 @@ class VideoEditorViewModel @Inject constructor(
         }
     }
 
+    fun onTextOverlaySelected(overlayId: Long?) {
+        _uiState.update { it.copy(selectedTextOverlayId = overlayId) }
+    }
+
+    fun onTextOverlayAdd() {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            val existing = com.worldstar.cut.features.video_editor.presentation.ui.screen.parseTextOverlays(clip.textOverlays).toMutableList()
+            val newOverlay = com.worldstar.cut.features.video_editor.domain.model.TextOverlay(
+                id = System.nanoTime(),
+                text = "New Text",
+                posX = 0.5f,
+                posY = 0.5f,
+                sizeSp = 24f,
+                color = android.graphics.Color.WHITE
+            )
+            existing.add(newOverlay)
+            val json = com.worldstar.cut.features.video_editor.presentation.ui.screen.serializeTextOverlays(existing)
+            updateClipUseCase(clip.copy(textOverlays = json))
+            _uiState.update { it.copy(selectedTextOverlayId = newOverlay.id) }
+        }
+    }
+
+    fun onTextOverlayTransformChanged(overlayId: Long, posX: Float, posY: Float, sizeSp: Float, rotation: Float) {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            val overlays = com.worldstar.cut.features.video_editor.presentation.ui.screen.parseTextOverlays(clip.textOverlays).toMutableList()
+            val idx = overlays.indexOfFirst { it.id == overlayId }
+            if (idx >= 0) {
+                overlays[idx] = overlays[idx].copy(posX = posX, posY = posY, sizeSp = sizeSp, rotation = rotation)
+                val json = com.worldstar.cut.features.video_editor.presentation.ui.screen.serializeTextOverlays(overlays)
+                updateClipUseCase(clip.copy(textOverlays = json))
+            }
+        }
+    }
+
+    fun onTextOverlayUpdate(overlayId: Long, text: String, color: Int, fontFamily: String) {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            val overlays = com.worldstar.cut.features.video_editor.presentation.ui.screen.parseTextOverlays(clip.textOverlays).toMutableList()
+            val idx = overlays.indexOfFirst { it.id == overlayId }
+            if (idx >= 0) {
+                overlays[idx] = overlays[idx].copy(text = text, color = color, fontFamily = fontFamily)
+                val json = com.worldstar.cut.features.video_editor.presentation.ui.screen.serializeTextOverlays(overlays)
+                updateClipUseCase(clip.copy(textOverlays = json))
+            }
+        }
+    }
+
     fun onDeleteClip() {
         val clip = _uiState.value.selectedClip ?: return
         viewModelScope.launch {

@@ -150,22 +150,19 @@ fun VideoEditorScreen(
                 isImage = uiState.videoClips.firstOrNull()?.isImage == true,
                 isPlaying = uiState.isPlaying,
                 progress = uiState.playbackProgress,
-                clipText = uiState.selectedClip?.text,
                 effectType = uiState.selectedClip?.effectType,
                 cropX = uiState.selectedClip?.cropX ?: 0f,
                 cropY = uiState.selectedClip?.cropY ?: 0f,
                 cropW = uiState.selectedClip?.cropW ?: 1f,
                 cropH = uiState.selectedClip?.cropH ?: 1f,
-                textPosX = uiState.selectedClip?.textPosX ?: 0.5f,
-                textPosY = uiState.selectedClip?.textPosY ?: 0.5f,
-                textSizeSp = uiState.selectedClip?.textSizeSp ?: 24f,
-                textRotation = uiState.selectedClip?.textRotation ?: 0f,
-                textColor = uiState.selectedClip?.textColor ?: Color.White.hashCode(),
-                fontFamilyName = uiState.selectedClip?.fontFamily ?: "default",
+                textOverlaysJson = uiState.selectedClip?.textOverlays,
+                selectedOverlayId = uiState.selectedTextOverlayId,
+                onOverlaySelected = viewModel::onTextOverlaySelected,
+                onOverlayTransformChanged = viewModel::onTextOverlayTransformChanged,
+                onOverlayAdd = viewModel::onTextOverlayAdd,
                 isTransitioning = uiState.isTransitioning,
                 transitionProgress = uiState.transitionProgress,
                 nextClipUri = uiState.videoClips.getOrNull(uiState.currentPlayingClipIndex + 1)?.mediaUri,
-                onTextTransformChanged = viewModel::onClipTextTransformChanged,
                 onPlayPause = viewModel::onPlayPause,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -195,12 +192,12 @@ fun VideoEditorScreen(
                     onTrimEndChanged = viewModel::onTrimEndChanged,
                     onVolumeChanged = viewModel::onClipVolumeChanged,
                     onSpeedChanged = viewModel::onClipSpeedChanged,
-                    onTextChanged = viewModel::onClipTextChanged,
-                    onTextColorChanged = viewModel::onClipTextColorChanged,
-                    onFontChanged = viewModel::onClipFontChanged,
                     onEffectChanged = viewModel::onClipEffectChanged,
                     onTransitionChanged = viewModel::onClipTransitionChanged,
                     onCropChanged = viewModel::onClipCropChanged,
+                    onOverlayAdd = viewModel::onTextOverlayAdd,
+                    selectedOverlayId = uiState.selectedTextOverlayId,
+                    onOverlayUpdate = viewModel::onTextOverlayUpdate,
                     onDelete = viewModel::onDeleteClip
                 )
             }
@@ -269,22 +266,19 @@ private fun VideoPreview(
     isImage: Boolean = false,
     isPlaying: Boolean,
     progress: Float,
-    clipText: String? = null,
     effectType: String? = null,
     cropX: Float = 0f,
     cropY: Float = 0f,
     cropW: Float = 1f,
     cropH: Float = 1f,
-    textPosX: Float = 0.5f,
-    textPosY: Float = 0.5f,
-    textSizeSp: Float = 24f,
-    textRotation: Float = 0f,
-    textColor: Int = Color.White.hashCode(),
-    fontFamilyName: String = "default",
+    textOverlaysJson: String? = null,
+    selectedOverlayId: Long? = null,
+    onOverlaySelected: (Long?) -> Unit = {},
+    onOverlayTransformChanged: (Long, Float, Float, Float, Float) -> Unit = { _, _, _, _, _ -> },
+    onOverlayAdd: () -> Unit = {},
     isTransitioning: Boolean = false,
     transitionProgress: Float = 0f,
     nextClipUri: String? = null,
-    onTextTransformChanged: (Float, Float, Float, Float) -> Unit = { _, _, _, _ -> },
     onPlayPause: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -432,17 +426,21 @@ private fun VideoPreview(
                 }
             }
 
-            // Text overlay (draggable, resizable, rotatable)
-            if (!clipText.isNullOrBlank()) {
+            // Text overlays (multiple, draggable, resizable, rotatable)
+            val overlays = remember(textOverlaysJson) { parseTextOverlays(textOverlaysJson) }
+            overlays.forEach { overlay ->
                 DraggableText(
-                    text = clipText,
-                    posX = textPosX,
-                    posY = textPosY,
-                    sizeSp = textSizeSp,
-                    rotation = textRotation,
-                    color = textColor,
-                    fontFamilyName = fontFamilyName,
-                    onTransformChanged = onTextTransformChanged
+                    overlayId = overlay.id,
+                    text = overlay.text,
+                    posX = overlay.posX,
+                    posY = overlay.posY,
+                    sizeSp = overlay.sizeSp,
+                    rotation = overlay.rotation,
+                    color = overlay.color,
+                    fontFamilyName = overlay.fontFamily,
+                    isSelected = selectedOverlayId == overlay.id,
+                    onSelect = onOverlaySelected,
+                    onTransformChanged = onOverlayTransformChanged
                 )
             }
 
@@ -583,12 +581,12 @@ private fun ToolPanel(
     onTrimEndChanged: (Long) -> Unit,
     onVolumeChanged: (Float) -> Unit,
     onSpeedChanged: (Float) -> Unit,
-    onTextChanged: (String) -> Unit,
-    onTextColorChanged: (Int) -> Unit,
-    onFontChanged: (String) -> Unit,
     onEffectChanged: (String?) -> Unit,
     onTransitionChanged: (String?) -> Unit,
     onCropChanged: (Float, Float, Float, Float) -> Unit,
+    onOverlayAdd: () -> Unit,
+    selectedOverlayId: Long?,
+    onOverlayUpdate: (Long, String, Int, String) -> Unit,
     onDelete: () -> Unit
 ) {
     Surface(
@@ -605,9 +603,10 @@ private fun ToolPanel(
                 )
                 EditorTool.Text -> TextTool(
                     clip = selectedClip,
-                    onTextChanged = onTextChanged,
-                    onTextColorChanged = onTextColorChanged,
-                    onFontChanged = onFontChanged
+                    onOverlayAdd = onOverlayAdd,
+                    selectedOverlayId = selectedOverlayId,
+                    overlaysJson = selectedClip?.textOverlays,
+                    onOverlayUpdate = onOverlayUpdate
                 )
                 EditorTool.Effects -> EffectsTool(
                     clip = selectedClip,
@@ -686,13 +685,17 @@ private fun TrimTool(
 @Composable
 private fun TextTool(
     clip: Clip?,
-    onTextChanged: (String) -> Unit,
-    onTextColorChanged: (Int) -> Unit,
-    onFontChanged: (String) -> Unit
+    onOverlayAdd: () -> Unit,
+    selectedOverlayId: Long?,
+    overlaysJson: String?,
+    onOverlayUpdate: (Long, String, Int, String) -> Unit
 ) {
-    var text by remember(clip) { mutableStateOf(clip?.text ?: "") }
-    val selectedColor = remember(clip) { mutableIntStateOf(clip?.textColor ?: Color.White.hashCode()) }
-    val selectedFont = remember(clip) { mutableStateOf(clip?.fontFamily ?: "default") }
+    val overlays = remember(overlaysJson) { parseTextOverlays(overlaysJson) }
+    val selectedOverlay = remember(overlays, selectedOverlayId) { overlays.find { it.id == selectedOverlayId } }
+
+    var editText by remember(selectedOverlay) { mutableStateOf(selectedOverlay?.text ?: "") }
+    val editColor = remember(selectedOverlay) { mutableIntStateOf(selectedOverlay?.color ?: Color.White.hashCode()) }
+    val editFont = remember(selectedOverlay) { mutableStateOf(selectedOverlay?.fontFamily ?: "default") }
 
     val colorOptions = listOf(
         "White" to Color.White.hashCode(),
@@ -716,68 +719,112 @@ private fun TextTool(
     )
 
     Column {
-        Text("Add Text", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
-        Spacer(Modifier.height(12.dp))
-        OutlinedTextField(
-            value = text,
-            onValueChange = { text = it; onTextChanged(it) },
-            placeholder = { Text("Enter text overlay...", color = TextDisabledDark) },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = WorldstarPurpleLight,
-                unfocusedBorderColor = SurfaceElevated,
-                focusedTextColor = TextPrimaryDark,
-                unfocusedTextColor = TextPrimaryDark,
-                cursorColor = WorldstarPurpleLight
-            ),
-            shape = RoundedCornerShape(12.dp),
-            maxLines = 3
-        )
-
-        Spacer(Modifier.height(16.dp))
-        Text("Color", style = MaterialTheme.typography.labelMedium, color = TextSecondaryDark)
-        Spacer(Modifier.height(8.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(colorOptions) { (name, colorInt) ->
-                val isSelected = selectedColor.intValue == colorInt
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(Color(colorInt))
-                        .then(
-                            if (isSelected) Modifier.border(3.dp, WorldstarCyan, CircleShape)
-                            else Modifier.border(1.dp, TextDisabledDark, CircleShape)
-                        )
-                        .clickable {
-                            selectedColor.intValue = colorInt
-                            onTextColorChanged(colorInt)
-                        }
-                )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Text Overlays", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onOverlayAdd) {
+                Text("+ Add", color = WorldstarCyan, style = MaterialTheme.typography.labelMedium)
             }
         }
 
-        Spacer(Modifier.height(16.dp))
-        Text("Font", style = MaterialTheme.typography.labelMedium, color = TextSecondaryDark)
-        Spacer(Modifier.height(8.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(fontOptions) { (name, fontKey) ->
-                val isSelected = selectedFont.value == fontKey
-                FilterChip(
-                    selected = isSelected,
-                    onClick = {
-                        selectedFont.value = fontKey
-                        onFontChanged(fontKey)
-                    },
-                    label = { Text(name, style = MaterialTheme.typography.labelSmall) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = WorldstarPurpleLight,
-                        selectedLabelColor = Color.White,
-                        containerColor = SurfaceDark,
-                        labelColor = TextSecondaryDark
+        if (overlays.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(overlays) { overlay ->
+                    FilterChip(
+                        selected = selectedOverlayId == overlay.id,
+                        onClick = { },
+                        label = {
+                            Text(
+                                text = overlay.text.take(12),
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = WorldstarPurpleLight,
+                            selectedLabelColor = Color.White,
+                            containerColor = SurfaceDark,
+                            labelColor = TextSecondaryDark
+                        )
                     )
-                )
+                }
             }
+        }
+
+        if (selectedOverlay != null) {
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = editText,
+                onValueChange = { editText = it; onOverlayUpdate(selectedOverlay.id, it, editColor.intValue, editFont.value) },
+                placeholder = { Text("Enter text...", color = TextDisabledDark) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = WorldstarPurpleLight,
+                    unfocusedBorderColor = SurfaceElevated,
+                    focusedTextColor = TextPrimaryDark,
+                    unfocusedTextColor = TextPrimaryDark,
+                    cursorColor = WorldstarPurpleLight
+                ),
+                shape = RoundedCornerShape(12.dp),
+                maxLines = 3
+            )
+
+            Spacer(Modifier.height(16.dp))
+            Text("Color", style = MaterialTheme.typography.labelMedium, color = TextSecondaryDark)
+            Spacer(Modifier.height(8.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(colorOptions) { (_, colorInt) ->
+                    val isSelected = editColor.intValue == colorInt
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(colorInt))
+                            .then(
+                                if (isSelected) Modifier.border(3.dp, WorldstarCyan, CircleShape)
+                                else Modifier.border(1.dp, TextDisabledDark, CircleShape)
+                            )
+                            .clickable {
+                                editColor.intValue = colorInt
+                                onOverlayUpdate(selectedOverlay.id, editText, colorInt, editFont.value)
+                            }
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            Text("Font", style = MaterialTheme.typography.labelMedium, color = TextSecondaryDark)
+            Spacer(Modifier.height(8.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(fontOptions) { (name, fontKey) ->
+                    val isSelected = editFont.value == fontKey
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = {
+                            editFont.value = fontKey
+                            onOverlayUpdate(selectedOverlay.id, editText, editColor.intValue, fontKey)
+                        },
+                        label = { Text(name, style = MaterialTheme.typography.labelSmall) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = WorldstarPurpleLight,
+                            selectedLabelColor = Color.White,
+                            containerColor = SurfaceDark,
+                            labelColor = TextSecondaryDark
+                        )
+                    )
+                }
+            }
+        } else {
+            Spacer(Modifier.height(24.dp))
+            Text(
+                "No text overlay selected.\nTap '+ Add' to add one, or tap a text on the preview to select it.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextDisabledDark
+            )
         }
     }
 }
@@ -1070,6 +1117,7 @@ private fun AdjustTool(onDelete: () -> Unit) {
 
 @Composable
 private fun DraggableText(
+    overlayId: Long,
     text: String,
     posX: Float,
     posY: Float,
@@ -1077,7 +1125,9 @@ private fun DraggableText(
     rotation: Float,
     color: Int = Color.White.hashCode(),
     fontFamilyName: String = "default",
-    onTransformChanged: (Float, Float, Float, Float) -> Unit
+    isSelected: Boolean,
+    onSelect: (Long) -> Unit,
+    onTransformChanged: (Long, Float, Float, Float, Float) -> Unit
 ) {
     var offset by remember { mutableStateOf(Offset(posX, posY)) }
     var scale by remember { mutableFloatStateOf(sizeSp / 24f) }
@@ -1119,16 +1169,21 @@ private fun DraggableText(
                     scaleY = scale
                     rotationZ = angle
                 }
-                .pointerInput(Unit) {
+                .pointerInput(overlayId) {
                     detectTransformGestures { _, pan, zoom, rotation ->
+                        onSelect(overlayId)
                         val newX = (offset.x + pan.x / containerSize.width).coerceIn(0f, 1f)
                         val newY = (offset.y + pan.y / containerSize.height).coerceIn(0f, 1f)
                         offset = Offset(newX, newY)
                         scale = (scale * zoom).coerceIn(0.3f, 4f)
                         angle = (angle + rotation) % 360f
-                        onTransformChanged(newX, newY, scale * 24f, angle)
+                        onTransformChanged(overlayId, newX, newY, scale * 24f, angle)
                     }
                 }
+                .then(
+                    if (isSelected) Modifier.border(2.dp, WorldstarCyan, RoundedCornerShape(6.dp))
+                    else Modifier
+                )
                 .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
                 .padding(horizontal = 12.dp, vertical = 6.dp)
         ) {
@@ -1146,6 +1201,48 @@ private fun DraggableText(
                     )
                 )
             )
+        }
+
+        // Resize handles (4 corners) — only visible when selected
+        if (isSelected) {
+            val handleSize = 12.dp
+            val handleTouchSize = 36.dp
+            val corners = listOf(
+                Alignment.TopStart to Offset(-1f, -1f),
+                Alignment.TopEnd to Offset(1f, -1f),
+                Alignment.BottomStart to Offset(-1f, 1f),
+                Alignment.BottomEnd to Offset(1f, 1f)
+            )
+            corners.forEach { (alignment, direction) ->
+                Box(
+                    modifier = Modifier
+                        .align(alignment)
+                        .offset {
+                            IntOffset(
+                                x = ((offset.x - 0.5f) * containerSize.width).roundToInt() + (direction.x * 40f * scale).roundToInt(),
+                                y = ((offset.y - 0.5f) * containerSize.height).roundToInt() + (direction.y * 20f * scale).roundToInt()
+                            )
+                        }
+                        .size(handleTouchSize)
+                        .pointerInput(overlayId, direction) {
+                            detectTransformGestures { _, pan, _, _ ->
+                                val scaleXDelta = pan.x / (containerSize.width * 0.5f)
+                                val scaleYDelta = pan.y / (containerSize.height * 0.5f)
+                                val avgDelta = (scaleXDelta * direction.x + scaleYDelta * direction.y) / 2f
+                                scale = (scale + avgDelta).coerceIn(0.3f, 4f)
+                                onTransformChanged(overlayId, offset.x, offset.y, scale * 24f, angle)
+                            }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(handleSize)
+                            .background(Color.White, CircleShape)
+                            .border(2.dp, WorldstarCyan, CircleShape)
+                    )
+                }
+            }
         }
     }
 }
@@ -1329,4 +1426,43 @@ private fun formatTime(ms: Long): String {
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
     return "%d:%02d".format(minutes, seconds)
+}
+
+private fun parseTextOverlays(json: String?): List<TextOverlay> {
+    if (json.isNullOrBlank()) return emptyList()
+    return try {
+        val arr = org.json.JSONArray(json)
+        (0 until arr.length()).map { i ->
+            val obj = arr.getJSONObject(i)
+            TextOverlay(
+                id = obj.optLong("id", 0L),
+                text = obj.optString("text", ""),
+                posX = obj.optDouble("posX", 0.5).toFloat(),
+                posY = obj.optDouble("posY", 0.5).toFloat(),
+                sizeSp = obj.optDouble("sizeSp", 24.0).toFloat(),
+                rotation = obj.optDouble("rotation", 0.0).toFloat(),
+                color = obj.optInt("color", -1),
+                fontFamily = obj.optString("fontFamily", "default")
+            )
+        }
+    } catch (_: Exception) {
+        emptyList()
+    }
+}
+
+fun serializeTextOverlays(overlays: List<TextOverlay>): String {
+    val arr = org.json.JSONArray()
+    overlays.forEach { o ->
+        arr.put(org.json.JSONObject().apply {
+            put("id", o.id)
+            put("text", o.text)
+            put("posX", o.posX.toDouble())
+            put("posY", o.posY.toDouble())
+            put("sizeSp", o.sizeSp.toDouble())
+            put("rotation", o.rotation.toDouble())
+            put("color", o.color)
+            put("fontFamily", o.fontFamily)
+        })
+    }
+    return arr.toString()
 }
