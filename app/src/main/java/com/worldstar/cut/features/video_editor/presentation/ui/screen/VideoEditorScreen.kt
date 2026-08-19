@@ -54,6 +54,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.worldstar.cut.core.ui.theme.*
 import com.worldstar.cut.features.video_editor.domain.model.Clip
+import com.worldstar.cut.features.video_editor.domain.model.TextOverlay
 import com.worldstar.cut.features.video_editor.presentation.viewmodel.EditorTool
 import com.worldstar.cut.features.video_editor.presentation.viewmodel.VideoEditorEvent
 import com.worldstar.cut.features.video_editor.presentation.viewmodel.VideoEditorViewModel
@@ -697,7 +698,7 @@ private fun TextTool(
     onOverlayUpdate: (Long, String, Int, String) -> Unit
 ) {
     val overlays = remember(overlaysJson) { parseTextOverlays(overlaysJson) }
-    val selectedOverlay = remember(overlays, selectedOverlayId) { overlays.find { it.id == selectedOverlayId } }
+    val selectedOverlay = remember(overlays, selectedOverlayId) { overlays.firstOrNull { it.id == selectedOverlayId } }
 
     var editText by remember(selectedOverlay) { mutableStateOf(selectedOverlay?.text ?: "") }
     val editColor = remember(selectedOverlay) { mutableIntStateOf(selectedOverlay?.color ?: Color.White.hashCode()) }
@@ -1434,7 +1435,7 @@ private fun formatTime(ms: Long): String {
     return "%d:%02d".format(minutes, seconds)
 }
 
-private fun parseTextOverlays(json: String?): List<TextOverlay> {
+internal fun parseTextOverlays(json: String?): List<TextOverlay> {
     if (json.isNullOrBlank()) return emptyList()
     return try {
         val arr = org.json.JSONArray(json)
