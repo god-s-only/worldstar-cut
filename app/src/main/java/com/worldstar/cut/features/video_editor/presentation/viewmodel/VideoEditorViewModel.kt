@@ -178,6 +178,20 @@ class VideoEditorViewModel @Inject constructor(
         }
     }
 
+    fun onClipTextColorChanged(color: Int) {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            updateClipUseCase(clip.copy(textColor = color))
+        }
+    }
+
+    fun onClipFontChanged(font: String) {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            updateClipUseCase(clip.copy(fontFamily = font))
+        }
+    }
+
     fun onClipEffectChanged(effect: String?) {
         val clip = _uiState.value.selectedClip ?: return
         viewModelScope.launch {
