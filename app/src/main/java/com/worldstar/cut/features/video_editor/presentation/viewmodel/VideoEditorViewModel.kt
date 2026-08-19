@@ -229,8 +229,9 @@ class VideoEditorViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
 
-            // Query actual media duration before creating project
-            val actualDuration = queryMediaDuration(mediaUri)
+            val isImage = isImageUri(mediaUri)
+            val mediaType = if (isImage) "image" else "video"
+            val actualDuration = if (isImage) 5_000L else queryMediaDuration(mediaUri)
             val name = "Project ${System.currentTimeMillis() / 1000}"
 
             when (val result = createProjectUseCase(name = name)) {
@@ -243,13 +244,16 @@ class VideoEditorViewModel @Inject constructor(
                                 Clip(
                                     trackId = trackId,
                                     mediaUri = mediaUri,
+                                    mediaType = mediaType,
                                     startMs = 0,
                                     endMs = actualDuration,
                                     durationMs = actualDuration
                                 )
                             )
                             loadProject(newProjectId)
-                            preparePlayerMedia(mediaUri)
+                            if (!isImage) {
+                                preparePlayerMedia(mediaUri)
+                            }
                         }
                         is Result.Error -> {
                             _uiState.update {
@@ -307,9 +311,9 @@ class VideoEditorViewModel @Inject constructor(
                         }
                         // Auto-prepare first video clip in player
                         if (track.type == "video" && result.data.isNotEmpty()) {
-                            val firstClip = result.data.first()
-                            if (player.mediaItemCount == 0) {
-                                preparePlayerMedia(firstClip.mediaUri)
+                            val firstVideoClip = result.data.firstOrNull { it.isVideo }
+                            if (firstVideoClip != null && player.mediaItemCount == 0) {
+                                preparePlayerMedia(firstVideoClip.mediaUri)
                             }
                         }
                     }
@@ -331,6 +335,16 @@ class VideoEditorViewModel @Inject constructor(
             duration
         } catch (_: Exception) {
             30_000L
+        }
+    }
+
+    private fun isImageUri(mediaUri: String): Boolean {
+        return try {
+            val context = application.applicationContext
+            val mimeType = context.contentResolver.getType(Uri.parse(mediaUri))
+            mimeType?.startsWith("image/") == true
+        } catch (_: Exception) {
+            false
         }
     }
 
