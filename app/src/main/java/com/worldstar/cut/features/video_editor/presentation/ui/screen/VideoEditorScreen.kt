@@ -747,13 +747,24 @@ private fun Timeline(
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = clip.mediaUri.substringAfterLast("/").take(12),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (isSelected) Color.White else TextSecondaryDark,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (clip.isImage) Icons.Outlined.Image else Icons.Outlined.Videocam,
+                                        contentDescription = null,
+                                        tint = if (isSelected) Color.White else TextSecondaryDark,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Text(
+                                        text = clip.mediaUri.substringAfterLast("/").take(10),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (isSelected) Color.White else TextSecondaryDark,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                                 Text(
                                     text = formatTime(clip.trimmedDurationMs),
                                     style = MaterialTheme.typography.labelSmall,
