@@ -64,6 +64,8 @@ class VideoEditorViewModel @Inject constructor(
                         _uiState.update { it.copy(totalDurationMs = dur, isPlaying = player.isPlaying) }
                     }
                     Player.STATE_ENDED -> {
+                        stopPositionPolling()
+                        player.seekTo(0L)
                         _uiState.update { it.copy(isPlaying = false, playbackPositionMs = 0L) }
                     }
                     Player.STATE_IDLE -> {}
