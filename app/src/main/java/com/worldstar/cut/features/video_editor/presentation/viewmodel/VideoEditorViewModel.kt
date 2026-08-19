@@ -176,6 +176,36 @@ class VideoEditorViewModel @Inject constructor(
         }
     }
 
+    fun onAddMediaClicked() {
+        val currentProjectId = _uiState.value.project?.id ?: return
+        viewModelScope.launch {
+            _events.emit(VideoEditorEvent.NavigateToAddMedia(currentProjectId))
+        }
+    }
+
+    fun onMediaAdded(mediaUri: String) {
+        val currentProject = _uiState.value.project ?: return
+        viewModelScope.launch {
+            val videoTrack = _uiState.value.videoTrack ?: return@launch
+            val isImage = isImageUri(mediaUri)
+            val mediaType = if (isImage) "image" else "video"
+            val actualDuration = if (isImage) 5_000L else queryMediaDuration(mediaUri)
+            val clipCount = _uiState.value.videoClips.size
+
+            addClipUseCase(
+                Clip(
+                    trackId = videoTrack.id,
+                    mediaUri = mediaUri,
+                    mediaType = mediaType,
+                    startMs = 0,
+                    endMs = actualDuration,
+                    durationMs = actualDuration,
+                    order = clipCount
+                )
+            )
+        }
+    }
+
     fun onZoomChanged(zoom: Float) {
         _uiState.update { it.copy(zoomLevel = zoom.coerceIn(0.5f, 3f)) }
     }
@@ -360,5 +390,6 @@ sealed class VideoEditorEvent {
     data object NavigateToExport : VideoEditorEvent()
     data object NavigateToPremium : VideoEditorEvent()
     data object NavigateBack : VideoEditorEvent()
+    data class NavigateToAddMedia(val projectId: Long) : VideoEditorEvent()
     data class ShowError(val message: String) : VideoEditorEvent()
 }
