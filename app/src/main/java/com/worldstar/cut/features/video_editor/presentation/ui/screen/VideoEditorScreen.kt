@@ -20,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -143,6 +144,10 @@ fun VideoEditorScreen(
                 progress = uiState.playbackProgress,
                 clipText = uiState.selectedClip?.text,
                 effectType = uiState.selectedClip?.effectType,
+                cropX = uiState.selectedClip?.cropX ?: 0f,
+                cropY = uiState.selectedClip?.cropY ?: 0f,
+                cropW = uiState.selectedClip?.cropW ?: 1f,
+                cropH = uiState.selectedClip?.cropH ?: 1f,
                 isTransitioning = uiState.isTransitioning,
                 transitionProgress = uiState.transitionProgress,
                 nextClipUri = uiState.videoClips.getOrNull(uiState.currentPlayingClipIndex + 1)?.mediaUri,
@@ -249,6 +254,10 @@ private fun VideoPreview(
     progress: Float,
     clipText: String? = null,
     effectType: String? = null,
+    cropX: Float = 0f,
+    cropY: Float = 0f,
+    cropW: Float = 1f,
+    cropH: Float = 1f,
     isTransitioning: Boolean = false,
     transitionProgress: Float = 0f,
     nextClipUri: String? = null,
@@ -256,6 +265,7 @@ private fun VideoPreview(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val needsCrop = cropX != 0f || cropY != 0f || cropW != 1f || cropH != 1f
 
     Box(
         modifier = modifier
@@ -264,6 +274,23 @@ private fun VideoPreview(
         contentAlignment = Alignment.Center
     ) {
         if (uri != null) {
+            // Wrapper that applies crop transform
+            val cropModifier = if (needsCrop) {
+                Modifier
+                    .fillMaxSize()
+                    .clipToBounds()
+                    .graphicsLayer {
+                        val cw = cropW.coerceAtLeast(0.1f)
+                        val ch = cropH.coerceAtLeast(0.1f)
+                        scaleX = 1f / cw
+                        scaleY = 1f / ch
+                        translationX = -cropX * size.width * scaleX
+                        translationY = -cropY * size.height * scaleY
+                    }
+            } else {
+                Modifier.fillMaxSize()
+            }
+
             if (isImage) {
                 // Static image preview using Coil
                 val colorFilter = remember(effectType) {
@@ -317,7 +344,7 @@ private fun VideoPreview(
                 coil.compose.AsyncImage(
                     model = uri,
                     contentDescription = "Image preview",
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = cropModifier,
                     contentScale = ContentScale.Fit,
                     colorFilter = colorFilter
                 )
@@ -334,7 +361,7 @@ private fun VideoPreview(
                     update = { playerView ->
                         playerView.player = player
                     },
-                    modifier = Modifier.fillMaxSize()
+                    modifier = cropModifier
                 )
 
                 // Play/Pause overlay (fades in/out)
