@@ -15,7 +15,10 @@ data class VideoEditorUiState(
     val totalDurationMs: Long = 0L,
     val activeTool: EditorTool = EditorTool.None,
     val zoomLevel: Float = 1f,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val currentPlayingClipIndex: Int = 0,
+    val transitionProgress: Float = 0f,
+    val isTransitioning: Boolean = false
 ) {
     val selectedClip: Clip?
         get() = clips.find { it.id == selectedClipId }

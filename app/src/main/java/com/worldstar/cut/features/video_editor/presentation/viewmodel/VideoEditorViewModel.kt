@@ -278,8 +278,30 @@ class VideoEditorViewModel @Inject constructor(
         positionPollingJob = viewModelScope.launch {
             while (player.isPlaying) {
                 val pos = player.currentPosition.coerceAtMost(player.duration)
-                _uiState.update { it.copy(playbackPositionMs = pos) }
-                delay(100)
+                val clipIndex = player.currentMediaItemIndex
+                val videoClips = _uiState.value.videoClips
+                val currentClip = videoClips.getOrNull(clipIndex)
+                val nextClip = videoClips.getOrNull(clipIndex + 1)
+
+                // Calculate transition state
+                val transitionMs = currentClip?.transitionDurationMs ?: 500L
+                val hasTransition = currentClip?.hasTransition == true && nextClip != null
+                val clipDuration = player.duration
+                val timeRemaining = clipDuration - pos
+                val transitioning = hasTransition && timeRemaining in 0..transitionMs
+                val transProgress = if (transitioning && transitionMs > 0) {
+                    ((transitionMs - timeRemaining).toFloat() / transitionMs).coerceIn(0f, 1f)
+                } else 0f
+
+                _uiState.update {
+                    it.copy(
+                        playbackPositionMs = pos,
+                        currentPlayingClipIndex = clipIndex,
+                        isTransitioning = transitioning,
+                        transitionProgress = transProgress
+                    )
+                }
+                delay(50)
             }
         }
     }
