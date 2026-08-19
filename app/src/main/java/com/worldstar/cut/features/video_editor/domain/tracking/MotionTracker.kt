@@ -2,15 +2,11 @@ package com.worldstar.cut.features.video_editor.domain.tracking
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Color
-import android.net.Uri
-import com.arthenica.ffmpegkit.FFmpegKit
-import com.arthenica.ffmpegkit.ReturnCode
+import android.media.MediaMetadataRetriever
 import com.worldstar.cut.features.video_editor.domain.model.MotionTrackPath
 import com.worldstar.cut.features.video_editor.domain.model.TrackedFrame
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -39,18 +35,16 @@ class MotionTracker @Inject constructor(
         config: TrackConfig = TrackConfig(),
         onProgress: (Float) -> Unit = {},
         isCancelled: () -> Boolean = { false }
-    ): MotionTrackPath = withContext(Dispatchers.Default) {
+    ): MotionTrackPath = withContext(Dispatchers.IO) {
 
-        val tempDir = File(context.cacheDir, "motion_track")
-        tempDir.mkdirs()
-
+        val retriever = MediaMetadataRetriever()
         try {
-            val frames = extractFrames(videoUri, startMs, endMs, config.sampleIntervalMs, tempDir)
-            if (frames.isEmpty()) {
-                return@withContext MotionTrackPath(
-                    targetX = startX, targetY = startY,
-                    status = "error"
-                )
+            retriever.setDataSource(context, android.net.Uri.parse(videoUri))
+
+            val durationMs = endMs - startMs
+            val totalFrames = (durationMs / config.sampleIntervalMs).toInt()
+            if (totalFrames <= 0) {
+                return@withContext MotionTrackPath(targetX = startX, targetY = startY, status = "error")
             }
 
             val trackedPositions = mutableListOf<TrackedFrame>()
@@ -59,70 +53,57 @@ class MotionTracker @Inject constructor(
             var targetPixels: IntArray? = null
             var targetWidth = 0
             var targetHeight = 0
+            var firstBitmapWidth = 1
+            var firstBitmapHeight = 1
 
-            frames.forEachIndexed { index, frameFile ->
+            for (i in 0 until totalFrames) {
                 ensureActive()
                 if (isCancelled()) {
                     return@withContext MotionTrackPath(
                         targetX = startX, targetY = startY,
-                        frames = trackedPositions,
-                        status = "cancelled"
+                        frames = trackedPositions, status = "cancelled"
                     )
                 }
 
-                val bitmap = BitmapFactory.decodeFile(frameFile.absolutePath) ?: return@forEachIndexed
-                val width = bitmap.width
-                val height = bitmap.height
+                val timeMs = startMs + (i * config.sampleIntervalMs)
+                val bitmap = retriever.getFrameAtTime(timeMs * 1000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                    ?: continue
 
-                if (index == 0) {
-                    targetWidth = minOf(config.targetSize, width / 4)
-                    targetHeight = minOf(config.targetSize, height / 4)
+                if (i == 0) {
+                    firstBitmapWidth = bitmap.width
+                    firstBitmapHeight = bitmap.height
+                    targetWidth = minOf(config.targetSize, bitmap.width / 4)
+                    targetHeight = minOf(config.targetSize, bitmap.height / 4)
                     targetPixels = sampleRegion(bitmap, startX, startY, targetWidth, targetHeight)
                 }
 
                 if (targetPixels != null) {
-                    val result = findTarget(
-                        bitmap, targetPixels!!, targetWidth, targetHeight,
-                        lastX, lastY, config.searchRadius
-                    )
+                    val result = findTarget(bitmap, targetPixels, targetWidth, targetHeight, lastX, lastY, config.searchRadius)
                     lastX = result.first
                     lastY = result.second
-
-                    val timeMs = startMs + (index * config.sampleIntervalMs)
                     trackedPositions.add(
-                        TrackedFrame(
-                            timeMs = timeMs,
-                            x = lastX,
-                            y = lastY,
-                            confidence = result.third
-                        )
+                        TrackedFrame(timeMs = timeMs, x = lastX, y = lastY, confidence = result.third)
                     )
                 }
 
                 bitmap.recycle()
-                onProgress((index + 1).toFloat() / frames.size)
+                withContext(Dispatchers.Main) {
+                    onProgress((i + 1).toFloat() / totalFrames)
+                }
             }
 
             MotionTrackPath(
                 targetX = startX,
                 targetY = startY,
-                targetWidth = targetWidth.toFloat() / (frames.firstOrNull()?.let {
-                    BitmapFactory.decodeFile(it.absolutePath)?.width ?: 1920
-                }?.also { if (frames.isNotEmpty()) BitmapFactory.decodeFile(frames.first().absolutePath)?.recycle() } ?: 1920),
-                targetHeight = targetHeight.toFloat() / (frames.firstOrNull()?.let {
-                    BitmapFactory.decodeFile(it.absolutePath)?.height ?: 1080
-                }?.also { if (frames.isNotEmpty()) BitmapFactory.decodeFile(frames.first().absolutePath)?.recycle() } ?: 1080),
+                targetWidth = targetWidth.toFloat() / firstBitmapWidth,
+                targetHeight = targetHeight.toFloat() / firstBitmapHeight,
                 frames = trackedPositions,
                 status = "completed"
             )
-        } catch (e: Exception) {
-            MotionTrackPath(
-                targetX = startX, targetY = startY,
-                status = "error"
-            )
+        } catch (_: Exception) {
+            MotionTrackPath(targetX = startX, targetY = startY, status = "error")
         } finally {
-            tempDir.listFiles()?.forEach { it.delete() }
-            tempDir.delete()
+            try { retriever.release() } catch (_: Exception) {}
         }
     }
 
@@ -210,37 +191,5 @@ class MotionTracker @Inject constructor(
 
         val confidence = (1f - (bestDist / 441.67f)).coerceIn(0f, 1f)
         return Triple(bestX.coerceIn(0f, 1f), bestY.coerceIn(0f, 1f), confidence)
-    }
-
-    private suspend fun extractFrames(
-        videoUri: String,
-        startMs: Long,
-        endMs: Long,
-        intervalMs: Long,
-        outputDir: File
-    ): List<File> = withContext(Dispatchers.IO) {
-        val outputPattern = File(outputDir, "frame_%04d.jpg").absolutePath
-        val durationMs = endMs - startMs
-        val fps = 1000.0 / intervalMs
-
-        val cmd = buildString {
-            append("-ss ${startMs}ms")
-            append(" -i \"$videoUri\"")
-            append(" -t ${durationMs}ms")
-            append(" -vf fps=$fps")
-            append(" -q:v 5")
-            append(" -vsync vfr")
-            append(" \"$outputPattern\"")
-        }
-
-        val session = FFmpegKit.execute(cmd)
-        if (!ReturnCode.isSuccess(session.returnCode)) {
-            return@withContext emptyList()
-        }
-
-        outputDir.listFiles()
-            ?.filter { it.extension == "jpg" }
-            ?.sortedBy { it.name }
-            ?: emptyList()
     }
 }
