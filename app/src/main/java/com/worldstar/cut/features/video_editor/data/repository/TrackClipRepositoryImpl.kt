@@ -165,7 +165,9 @@ class TrackClipRepositoryImpl @Inject constructor(
         text = text,
         textColor = textColor,
         textSize = textSize,
-        effectType = effectType
+        effectType = effectType,
+        transitionType = transitionType,
+        transitionDurationMs = transitionDurationMs
     )
 
     private fun Clip.toEntity() = ClipEntity(
@@ -186,6 +188,8 @@ class TrackClipRepositoryImpl @Inject constructor(
         text = text,
         textColor = textColor,
         textSize = textSize,
-        effectType = effectType
+        effectType = effectType,
+        transitionType = transitionType,
+        transitionDurationMs = transitionDurationMs
     )
 }
