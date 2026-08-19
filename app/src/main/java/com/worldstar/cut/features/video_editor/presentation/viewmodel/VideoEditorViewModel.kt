@@ -199,6 +199,13 @@ class VideoEditorViewModel @Inject constructor(
         }
     }
 
+    fun onClipTextTransformChanged(posX: Float, posY: Float, sizeSp: Float, rotation: Float) {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            updateClipUseCase(clip.copy(textPosX = posX, textPosY = posY, textSizeSp = sizeSp, textRotation = rotation))
+        }
+    }
+
     fun onDeleteClip() {
         val clip = _uiState.value.selectedClip ?: return
         viewModelScope.launch {

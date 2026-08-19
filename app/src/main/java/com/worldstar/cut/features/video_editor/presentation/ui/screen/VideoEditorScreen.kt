@@ -4,6 +4,7 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -27,13 +28,18 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -148,9 +154,14 @@ fun VideoEditorScreen(
                 cropY = uiState.selectedClip?.cropY ?: 0f,
                 cropW = uiState.selectedClip?.cropW ?: 1f,
                 cropH = uiState.selectedClip?.cropH ?: 1f,
+                textPosX = uiState.selectedClip?.textPosX ?: 0.5f,
+                textPosY = uiState.selectedClip?.textPosY ?: 0.5f,
+                textSizeSp = uiState.selectedClip?.textSizeSp ?: 24f,
+                textRotation = uiState.selectedClip?.textRotation ?: 0f,
                 isTransitioning = uiState.isTransitioning,
                 transitionProgress = uiState.transitionProgress,
                 nextClipUri = uiState.videoClips.getOrNull(uiState.currentPlayingClipIndex + 1)?.mediaUri,
+                onTextTransformChanged = viewModel::onClipTextTransformChanged,
                 onPlayPause = viewModel::onPlayPause,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -258,9 +269,14 @@ private fun VideoPreview(
     cropY: Float = 0f,
     cropW: Float = 1f,
     cropH: Float = 1f,
+    textPosX: Float = 0.5f,
+    textPosY: Float = 0.5f,
+    textSizeSp: Float = 24f,
+    textRotation: Float = 0f,
     isTransitioning: Boolean = false,
     transitionProgress: Float = 0f,
     nextClipUri: String? = null,
+    onTextTransformChanged: (Float, Float, Float, Float) -> Unit = { _, _, _, _ -> },
     onPlayPause: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -408,21 +424,16 @@ private fun VideoPreview(
                 }
             }
 
-            // Text overlay
+            // Text overlay (draggable, resizable, rotatable)
             if (!clipText.isNullOrBlank()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = clipText,
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = Color.White,
-                        textAlign = TextAlign.Center
-                    )
-                }
+                DraggableText(
+                    text = clipText,
+                    posX = textPosX,
+                    posY = textPosY,
+                    sizeSp = textSizeSp,
+                    rotation = textRotation,
+                    onTransformChanged = onTextTransformChanged
+                )
             }
 
             // Cross-fade transition overlay
@@ -966,6 +977,75 @@ private fun AdjustTool(onDelete: () -> Unit) {
             Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text("Delete Clip")
+        }
+    }
+}
+
+// ─── Draggable Text Overlay ──────────────────────────────────────────────────
+
+@Composable
+private fun DraggableText(
+    text: String,
+    posX: Float,
+    posY: Float,
+    sizeSp: Float,
+    rotation: Float,
+    onTransformChanged: (Float, Float, Float, Float) -> Unit
+) {
+    var offset by remember { mutableStateOf(Offset(posX, posY)) }
+    var scale by remember { mutableFloatStateOf(sizeSp / 24f) }
+    var angle by remember { mutableFloatStateOf(rotation) }
+
+    // Sync from clip state when it changes externally
+    LaunchedEffect(posX, posY, sizeSp, rotation) {
+        offset = Offset(posX, posY)
+        scale = sizeSp / 24f
+        angle = rotation
+    }
+
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .offset {
+                    IntOffset(
+                        x = ((offset.x - 0.5f) * size.width).roundToInt(),
+                        y = ((offset.y - 0.5f) * size.height).roundToInt()
+                    )
+                }
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    rotationZ = angle
+                }
+                .pointerInput(Unit) {
+                    detectTransformGestures { _, pan, zoom, rotation ->
+                        val newX = (offset.x + pan.x / size.width).coerceIn(0f, 1f)
+                        val newY = (offset.y + pan.y / size.height).coerceIn(0f, 1f)
+                        offset = Offset(newX, newY)
+                        scale = (scale * zoom).coerceIn(0.3f, 4f)
+                        angle = (angle + rotation) % 360f
+                        onTransformChanged(newX, newY, scale * 24f, angle)
+                    }
+                }
+                .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+        ) {
+            Text(
+                text = text,
+                fontSize = (24 * scale).sp,
+                color = Color.White,
+                textAlign = TextAlign.Center,
+                style = TextStyle(
+                    shadow = Shadow(
+                        color = Color.Black,
+                        offset = Offset(2f, 2f),
+                        blurRadius = 4f
+                    )
+                )
+            )
         }
     }
 }
