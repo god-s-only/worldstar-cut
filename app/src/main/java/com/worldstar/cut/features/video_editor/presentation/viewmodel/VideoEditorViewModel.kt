@@ -360,12 +360,9 @@ class VideoEditorViewModel @Inject constructor(
                             val autoSelect = if (state.selectedClipId == null && newClips.isNotEmpty()) newClips.first().id else state.selectedClipId
                             state.copy(clips = newClips, totalDurationMs = totalDuration, selectedClipId = autoSelect)
                         }
-                        // Auto-prepare first video clip in player
-                        if (track.type == "video" && result.data.isNotEmpty()) {
-                            val firstVideoClip = result.data.firstOrNull { it.isVideo }
-                            if (firstVideoClip != null && player.mediaItemCount == 0) {
-                                preparePlayerMedia(firstVideoClip.mediaUri)
-                            }
+                        // Prepare all video clips as a playlist in ExoPlayer
+                        if (track.type == "video" && result.data.isNotEmpty() && player.mediaItemCount == 0) {
+                            prepareAllVideoClips(result.data)
                         }
                     }
                     else -> {}
