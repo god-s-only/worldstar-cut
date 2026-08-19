@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.worldstar.cut.core.domain.result.Result
 import com.worldstar.cut.features.video_editor.domain.model.Clip
 import com.worldstar.cut.features.video_editor.domain.model.Track
+import com.worldstar.cut.features.video_editor.domain.tracking.MotionTracker
 import com.worldstar.cut.features.video_editor.domain.usecase.*
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -40,7 +41,8 @@ class VideoEditorViewModel @Inject constructor(
     private val addTrackUseCase: AddTrackUseCase,
     private val addClipUseCase: AddClipUseCase,
     private val updateClipUseCase: UpdateClipUseCase,
-    private val deleteClipUseCase: DeleteClipUseCase
+    private val deleteClipUseCase: DeleteClipUseCase,
+    private val motionTracker: MotionTracker
 ) : ViewModel() {
 
     private val projectId: Long = savedStateHandle["project_id"] ?: -1L
@@ -53,6 +55,7 @@ class VideoEditorViewModel @Inject constructor(
     val events: SharedFlow<VideoEditorEvent> = _events.asSharedFlow()
 
     private var tracksJob: Job? = null
+    private var trackingJob: Job? = null
     private var positionPollingJob: Job? = null
 
     val player: ExoPlayer = ExoPlayer.Builder(application).build()
@@ -275,6 +278,56 @@ class VideoEditorViewModel @Inject constructor(
             deleteClipUseCase(clip.id)
             _uiState.update { it.copy(selectedClipId = null, activeTool = EditorTool.None) }
         }
+    }
+
+    fun onStartMotionTracking() {
+        val clip = _uiState.value.selectedClip ?: return
+        if (clip.isImage) return
+
+        val overlays = try {
+            com.worldstar.cut.features.video_editor.presentation.ui.screen.parseTextOverlays(clip.textOverlays)
+        } catch (_: Exception) { emptyList() }
+
+        val selectedId = _uiState.value.selectedTextOverlayId
+        val overlay = overlays.find { it.id == selectedId }
+
+        if (overlay == null) {
+            _uiState.update { it.copy(isTracking = false) }
+            return
+        }
+
+        trackingJob?.cancel()
+        trackingJob = viewModelScope.launch {
+            _uiState.update { it.copy(isTracking = true, trackProgress = 0f) }
+
+            try {
+                val result = motionTracker.track(
+                    videoUri = clip.mediaUri,
+                    startX = overlay.posX,
+                    startY = overlay.posY,
+                    startMs = clip.startMs + clip.trimStartMs,
+                    endMs = clip.endMs - clip.trimEndMs,
+                    onProgress = { progress ->
+                        _uiState.update { it.copy(trackProgress = progress) }
+                    },
+                    isCancelled = { trackingJob?.isCancelled == true }
+                )
+
+                if (result.status == "completed" || result.frames.isNotEmpty()) {
+                    val trackJson = com.google.gson.Gson().toJson(result)
+                    updateClipUseCase(clip.copy(motionTrack = trackJson))
+                }
+            } catch (_: Exception) {
+            } finally {
+                _uiState.update { it.copy(isTracking = false, trackProgress = 0f) }
+            }
+        }
+    }
+
+    fun onCancelMotionTracking() {
+        trackingJob?.cancel()
+        trackingJob = null
+        _uiState.update { it.copy(isTracking = false, trackProgress = 0f) }
     }
 
     fun onAddMediaClicked() {

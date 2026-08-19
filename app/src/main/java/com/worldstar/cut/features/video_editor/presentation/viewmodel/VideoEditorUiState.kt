@@ -19,7 +19,9 @@ data class VideoEditorUiState(
     val currentPlayingClipIndex: Int = 0,
     val transitionProgress: Float = 0f,
     val isTransitioning: Boolean = false,
-    val selectedTextOverlayId: Long? = null
+    val selectedTextOverlayId: Long? = null,
+    val isTracking: Boolean = false,
+    val trackProgress: Float = 0f
 ) {
     val selectedClip: Clip?
         get() = clips.find { it.id == selectedClipId }
@@ -50,5 +52,5 @@ data class VideoEditorUiState(
 }
 
 enum class EditorTool {
-    None, Trim, Text, Effects, Speed, Volume, Adjust, Transition, Crop
+    None, Trim, Text, Effects, Speed, Volume, Adjust, Transition, Crop, MotionTrack
 }

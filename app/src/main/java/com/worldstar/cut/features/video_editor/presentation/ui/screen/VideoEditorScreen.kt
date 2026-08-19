@@ -164,6 +164,8 @@ fun VideoEditorScreen(
                 cropW = uiState.selectedClip?.cropW ?: 1f,
                 cropH = uiState.selectedClip?.cropH ?: 1f,
                 textOverlaysJson = uiState.selectedClip?.textOverlays,
+                motionTrackJson = uiState.selectedClip?.motionTrack,
+                playbackMs = uiState.playbackPositionMs,
                 selectedOverlayId = uiState.selectedTextOverlayId,
                 onOverlaySelected = viewModel::onTextOverlaySelected,
                 onOverlayTransformChanged = viewModel::onTextOverlayTransformChanged,
@@ -206,6 +208,10 @@ fun VideoEditorScreen(
                     onOverlayAdd = viewModel::onTextOverlayAdd,
                     selectedOverlayId = uiState.selectedTextOverlayId,
                     onOverlayUpdate = viewModel::onTextOverlayUpdate,
+                    isTracking = uiState.isTracking,
+                    trackProgress = uiState.trackProgress,
+                    onStartTracking = viewModel::onStartMotionTracking,
+                    onCancelTracking = viewModel::onCancelMotionTracking,
                     onDelete = viewModel::onDeleteClip
                 )
             }
@@ -280,6 +286,8 @@ private fun VideoPreview(
     cropW: Float = 1f,
     cropH: Float = 1f,
     textOverlaysJson: String? = null,
+    motionTrackJson: String? = null,
+    playbackMs: Long = 0L,
     selectedOverlayId: Long? = null,
     onOverlaySelected: (Long?) -> Unit = {},
     onOverlayTransformChanged: (Long, Float, Float, Float, Float) -> Unit = { _, _, _, _, _ -> },
@@ -436,12 +444,26 @@ private fun VideoPreview(
 
             // Text overlays (multiple, draggable, resizable, rotatable)
             val overlays = remember(textOverlaysJson) { parseTextOverlays(textOverlaysJson) }
+            val motionTrack = remember(motionTrackJson) {
+                if (!motionTrackJson.isNullOrBlank()) {
+                    try { com.google.gson.Gson().fromJson(motionTrackJson, com.worldstar.cut.features.video_editor.domain.model.MotionTrackPath::class.java) } catch (_: Exception) { null }
+                } else null
+            }
             overlays.forEach { overlay ->
+                val trackedPos = if (motionTrack != null && isPlaying) {
+                    val frames = motionTrack.frames
+                    if (frames.isNotEmpty()) {
+                        val match = frames.lastOrNull { it.timeMs <= playbackMs }
+                            ?: frames.firstOrNull()
+                        match?.let { com.worldstar.cut.features.video_editor.domain.model.TrackedFrame(x = it.x, y = it.y) }
+                    } else null
+                } else null
+
                 DraggableText(
                     overlayId = overlay.id,
                     text = overlay.text,
-                    posX = overlay.posX,
-                    posY = overlay.posY,
+                    posX = trackedPos?.x ?: overlay.posX,
+                    posY = trackedPos?.y ?: overlay.posY,
                     sizeSp = overlay.sizeSp,
                     rotation = overlay.rotation,
                     color = overlay.color,
@@ -516,6 +538,7 @@ private fun EditorToolsBar(
         EditorTool.Effects to Icons.Filled.AutoFixHigh,
         EditorTool.Transition to Icons.Filled.SyncAlt,
         EditorTool.Crop to Icons.Filled.Crop,
+        EditorTool.MotionTrack to Icons.Filled.GpsFixed,
         EditorTool.Speed to Icons.Filled.Speed,
         EditorTool.Volume to Icons.Filled.VolumeUp,
         EditorTool.Adjust to Icons.Filled.Tune
@@ -534,7 +557,7 @@ private fun EditorToolsBar(
             val enabled = when (tool) {
                 EditorTool.Trim, EditorTool.Text, EditorTool.Effects,
                 EditorTool.Speed, EditorTool.Volume, EditorTool.Adjust,
-                EditorTool.Transition, EditorTool.Crop -> hasSelection
+                EditorTool.Transition, EditorTool.Crop, EditorTool.MotionTrack -> hasSelection
                 else -> true
             }
 
@@ -595,6 +618,10 @@ private fun ToolPanel(
     onOverlayAdd: () -> Unit,
     selectedOverlayId: Long?,
     onOverlayUpdate: (Long, String, Int, String) -> Unit,
+    isTracking: Boolean,
+    trackProgress: Float,
+    onStartTracking: () -> Unit,
+    onCancelTracking: () -> Unit,
     onDelete: () -> Unit
 ) {
     Surface(
@@ -627,6 +654,12 @@ private fun ToolPanel(
                 EditorTool.Crop -> CropTool(
                     clip = selectedClip,
                     onCropChanged = onCropChanged
+                )
+                EditorTool.MotionTrack -> MotionTrackTool(
+                    isTracking = isTracking,
+                    trackProgress = trackProgress,
+                    onStartTracking = onStartTracking,
+                    onCancelTracking = onCancelTracking
                 )
                 EditorTool.Speed -> SpeedTool(
                     clip = selectedClip,
@@ -1016,6 +1049,71 @@ private fun CropTool(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Reset Crop")
+        }
+    }
+}
+
+@Composable
+private fun MotionTrackTool(
+    isTracking: Boolean,
+    trackProgress: Float,
+    onStartTracking: () -> Unit,
+    onCancelTracking: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("Motion Tracking", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Select a text overlay, then tap Start to track its position through the video.",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondaryDark
+        )
+        Spacer(Modifier.height(16.dp))
+
+        if (isTracking) {
+            LinearProgressIndicator(
+                progress = { trackProgress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp)),
+                color = WorldstarCyan,
+                trackColor = SurfaceDark
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "Tracking... ${(trackProgress * 100).toInt()}%",
+                style = MaterialTheme.typography.labelMedium,
+                color = WorldstarCyan
+            )
+            Spacer(Modifier.height(16.dp))
+            OutlinedButton(
+                onClick = onCancelTracking,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Icon(Icons.Default.Cancel, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Cancel")
+            }
+        } else {
+            Button(
+                onClick = onStartTracking,
+                colors = ButtonDefaults.buttonColors(containerColor = WorldstarCyan),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.GpsFixed, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Start Tracking", fontWeight = FontWeight.SemiBold, color = Color.White)
+            }
         }
     }
 }
