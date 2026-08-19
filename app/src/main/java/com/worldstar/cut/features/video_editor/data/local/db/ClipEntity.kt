@@ -23,6 +23,7 @@ data class ClipEntity(
     val trackId: Long,
     val mediaUri: String,
     val mediaPath: String = "",
+    val mediaType: String = "video",
     val startMs: Long = 0,
     val endMs: Long = 0,
     val trimStartMs: Long = 0,
