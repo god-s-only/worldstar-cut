@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -105,6 +106,7 @@ fun VideoEditorScreen(
             VideoPreview(
                 player = viewModel.player,
                 uri = uiState.videoClips.firstOrNull()?.mediaUri,
+                isImage = uiState.videoClips.firstOrNull()?.isImage == true,
                 isPlaying = uiState.isPlaying,
                 progress = uiState.playbackProgress,
                 onPlayPause = viewModel::onPlayPause,
@@ -199,6 +201,7 @@ private fun EditorTopBar(
 private fun VideoPreview(
     player: ExoPlayer,
     uri: String?,
+    isImage: Boolean = false,
     isPlaying: Boolean,
     progress: Float,
     onPlayPause: () -> Unit,
@@ -209,44 +212,54 @@ private fun VideoPreview(
     Box(
         modifier = modifier
             .background(Color.Black)
-            .clickable(onClick = onPlayPause),
+            .then(if (!isImage) Modifier.clickable(onClick = onPlayPause) else Modifier),
         contentAlignment = Alignment.Center
     ) {
         if (uri != null) {
-            // Real ExoPlayer PlayerView
-            AndroidView(
-                factory = {
-                    PlayerView(context).apply {
-                        this.player = player
-                        useController = false
-                        setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
-                    }
-                },
-                update = { playerView ->
-                    playerView.player = player
-                },
-                modifier = Modifier.fillMaxSize()
-            )
+            if (isImage) {
+                // Static image preview using Coil
+                coil.compose.AsyncImage(
+                    model = uri,
+                    contentDescription = "Image preview",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
+                )
+            } else {
+                // Real ExoPlayer PlayerView
+                AndroidView(
+                    factory = {
+                        PlayerView(context).apply {
+                            this.player = player
+                            useController = false
+                            setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
+                        }
+                    },
+                    update = { playerView ->
+                        playerView.player = player
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
 
-            // Play/Pause overlay (fades in/out)
-            AnimatedVisibility(
-                visible = !isPlaying,
-                enter = fadeIn(),
-                exit = fadeOut(),
-                modifier = Modifier.align(Alignment.Center)
-            ) {
-                Surface(
-                    modifier = Modifier.size(56.dp),
-                    shape = CircleShape,
-                    color = Color.Black.copy(alpha = 0.5f)
+                // Play/Pause overlay (fades in/out)
+                AnimatedVisibility(
+                    visible = !isPlaying,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                    modifier = Modifier.align(Alignment.Center)
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Filled.PlayArrow,
-                            contentDescription = "Play",
-                            tint = Color.White,
-                            modifier = Modifier.size(32.dp)
-                        )
+                    Surface(
+                        modifier = Modifier.size(56.dp),
+                        shape = CircleShape,
+                        color = Color.Black.copy(alpha = 0.5f)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Filled.PlayArrow,
+                                contentDescription = "Play",
+                                tint = Color.White,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -268,20 +281,22 @@ private fun VideoPreview(
             }
         }
 
-        // Progress bar at bottom
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(3.dp)
-                .align(Alignment.BottomCenter)
-                .background(SurfaceDark)
-        ) {
+        // Progress bar at bottom (hidden for images)
+        if (!isImage) {
             Box(
                 modifier = Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(fraction = progress)
-                    .background(WorldstarPink)
-            )
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .align(Alignment.BottomCenter)
+                    .background(SurfaceDark)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(fraction = progress)
+                        .background(WorldstarPink)
+                )
+            }
         }
     }
 }
