@@ -18,7 +18,9 @@ data class Clip(
     val text: String? = null,
     val textColor: Int? = null,
     val textSize: Float? = null,
-    val effectType: String? = null
+    val effectType: String? = null,
+    val transitionType: String? = null,
+    val transitionDurationMs: Long = 500L
 ) {
     val trimmedDurationMs: Long
         get() = (endMs - startMs) - (trimStartMs + trimEndMs)
@@ -27,4 +29,5 @@ data class Clip(
     val isImage: Boolean get() = mediaType == "image"
     val hasText: Boolean get() = !text.isNullOrBlank()
     val hasEffect: Boolean get() = effectType != null
+    val hasTransition: Boolean get() = transitionType != null
 }
