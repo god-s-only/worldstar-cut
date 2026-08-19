@@ -54,8 +54,11 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.worldstar.cut.core.ui.theme.*
+import com.google.gson.Gson
 import com.worldstar.cut.features.video_editor.domain.model.Clip
+import com.worldstar.cut.features.video_editor.domain.model.MotionTrackPath
 import com.worldstar.cut.features.video_editor.domain.model.TextOverlay
+import com.worldstar.cut.features.video_editor.domain.model.TrackedFrame
 import com.worldstar.cut.features.video_editor.presentation.viewmodel.EditorTool
 import com.worldstar.cut.features.video_editor.presentation.viewmodel.VideoEditorEvent
 import com.worldstar.cut.features.video_editor.presentation.viewmodel.VideoEditorViewModel
@@ -446,7 +449,7 @@ private fun VideoPreview(
             val overlays = remember(textOverlaysJson) { parseTextOverlays(textOverlaysJson) }
             val motionTrack = remember(motionTrackJson) {
                 if (!motionTrackJson.isNullOrBlank()) {
-                    try { com.google.gson.Gson().fromJson(motionTrackJson, com.worldstar.cut.features.video_editor.domain.model.MotionTrackPath::class.java) } catch (_: Exception) { null }
+                    try { Gson().fromJson(motionTrackJson, MotionTrackPath::class.java) } catch (_: Exception) { null }
                 } else null
             }
             overlays.forEach { overlay ->
@@ -455,7 +458,7 @@ private fun VideoPreview(
                     if (frames.isNotEmpty()) {
                         val match = frames.lastOrNull { it.timeMs <= playbackMs }
                             ?: frames.firstOrNull()
-                        match?.let { com.worldstar.cut.features.video_editor.domain.model.TrackedFrame(x = it.x, y = it.y) }
+                        match?.let { TrackedFrame(x = it.x, y = it.y) }
                     } else null
                 } else null
 

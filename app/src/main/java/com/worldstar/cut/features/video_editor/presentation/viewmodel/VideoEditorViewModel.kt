@@ -6,10 +6,13 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.worldstar.cut.core.domain.result.Result
+import com.google.gson.Gson
 import com.worldstar.cut.features.video_editor.domain.model.Clip
 import com.worldstar.cut.features.video_editor.domain.model.Track
 import com.worldstar.cut.features.video_editor.domain.tracking.MotionTracker
 import com.worldstar.cut.features.video_editor.domain.usecase.*
+import parseTextOverlays
+import serializeTextOverlays
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -230,7 +233,7 @@ class VideoEditorViewModel @Inject constructor(
     fun onTextOverlayAdd() {
         val clip = _uiState.value.selectedClip ?: return
         viewModelScope.launch {
-            val existing = com.worldstar.cut.features.video_editor.presentation.ui.screen.parseTextOverlays(clip.textOverlays).toMutableList()
+            val existing = parseTextOverlays(clip.textOverlays).toMutableList()
             val newOverlay = com.worldstar.cut.features.video_editor.domain.model.TextOverlay(
                 id = System.nanoTime(),
                 text = "New Text",
@@ -240,7 +243,7 @@ class VideoEditorViewModel @Inject constructor(
                 color = android.graphics.Color.WHITE
             )
             existing.add(newOverlay)
-            val json = com.worldstar.cut.features.video_editor.presentation.ui.screen.serializeTextOverlays(existing)
+            val json = serializeTextOverlays(existing)
             updateClipUseCase(clip.copy(textOverlays = json))
             _uiState.update { it.copy(selectedTextOverlayId = newOverlay.id) }
         }
@@ -249,11 +252,11 @@ class VideoEditorViewModel @Inject constructor(
     fun onTextOverlayTransformChanged(overlayId: Long, posX: Float, posY: Float, sizeSp: Float, rotation: Float) {
         val clip = _uiState.value.selectedClip ?: return
         viewModelScope.launch {
-            val overlays = com.worldstar.cut.features.video_editor.presentation.ui.screen.parseTextOverlays(clip.textOverlays).toMutableList()
+            val overlays = parseTextOverlays(clip.textOverlays).toMutableList()
             val idx = overlays.indexOfFirst { it.id == overlayId }
             if (idx >= 0) {
                 overlays[idx] = overlays[idx].copy(posX = posX, posY = posY, sizeSp = sizeSp, rotation = rotation)
-                val json = com.worldstar.cut.features.video_editor.presentation.ui.screen.serializeTextOverlays(overlays)
+                val json = serializeTextOverlays(overlays)
                 updateClipUseCase(clip.copy(textOverlays = json))
             }
         }
@@ -262,11 +265,11 @@ class VideoEditorViewModel @Inject constructor(
     fun onTextOverlayUpdate(overlayId: Long, text: String, color: Int, fontFamily: String) {
         val clip = _uiState.value.selectedClip ?: return
         viewModelScope.launch {
-            val overlays = com.worldstar.cut.features.video_editor.presentation.ui.screen.parseTextOverlays(clip.textOverlays).toMutableList()
+            val overlays = parseTextOverlays(clip.textOverlays).toMutableList()
             val idx = overlays.indexOfFirst { it.id == overlayId }
             if (idx >= 0) {
                 overlays[idx] = overlays[idx].copy(text = text, color = color, fontFamily = fontFamily)
-                val json = com.worldstar.cut.features.video_editor.presentation.ui.screen.serializeTextOverlays(overlays)
+                val json = serializeTextOverlays(overlays)
                 updateClipUseCase(clip.copy(textOverlays = json))
             }
         }
@@ -285,7 +288,7 @@ class VideoEditorViewModel @Inject constructor(
         if (clip.isImage) return
 
         val overlays = try {
-            com.worldstar.cut.features.video_editor.presentation.ui.screen.parseTextOverlays(clip.textOverlays)
+            parseTextOverlays(clip.textOverlays)
         } catch (_: Exception) { emptyList() }
 
         val selectedId = _uiState.value.selectedTextOverlayId
