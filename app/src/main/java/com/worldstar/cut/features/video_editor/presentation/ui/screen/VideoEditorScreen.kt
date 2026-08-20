@@ -174,6 +174,7 @@ fun VideoEditorScreen(
                 progress = uiState.playbackProgress,
                 effectType = uiState.selectedClip?.effectType,
                 motionEffect = uiState.selectedClip?.motionEffect,
+                motionSegmentsJson = uiState.selectedClip?.motionSegments,
                 cropX = uiState.selectedClip?.cropX ?: 0f,
                 cropY = uiState.selectedClip?.cropY ?: 0f,
                 cropW = uiState.selectedClip?.cropW ?: 1f,
@@ -321,6 +322,7 @@ private fun VideoPreview(
     progress: Float,
     effectType: String? = null,
     motionEffect: String? = null,
+    motionSegmentsJson: String? = null,
     cropX: Float = 0f,
     cropY: Float = 0f,
     cropW: Float = 1f,
@@ -365,11 +367,15 @@ private fun VideoPreview(
             } else {
                 Modifier.fillMaxSize()
             }
-            // Advanced motion effect (zoom/pan/rotate/shake/ken_burns/tilt/parallax)
+            // Advanced motion effect — multi-segment (SaaS)
+            val motionSegments = remember(motionSegmentsJson) { parseMotionSegments(motionSegmentsJson) }
+            val activeMotion = motionSegments.firstOrNull { playbackMs in it.startMs until it.startMs + it.durationMs }
+            val effectiveMotion = activeMotion?.effect ?: motionEffect
+            val motionProgress = activeMotion?.let { (playbackMs - it.startMs).toFloat() / it.durationMs.coerceAtLeast(1).toFloat() } ?: progress.coerceIn(0f, 1f)
             val motionModifier = Modifier.graphicsLayer {
-                if (motionEffect == null || motionEffect == "none") return@graphicsLayer
-                val p = progress.coerceIn(0f, 1f)
-                when (motionEffect) {
+                if (effectiveMotion == null || effectiveMotion == "none") return@graphicsLayer
+                val p = motionProgress.coerceIn(0f, 1f)
+                when (effectiveMotion) {
                     "zoom_in" -> { scaleX = 1f + 0.3f * p; scaleY = 1f + 0.3f * p }
                     "zoom_out" -> { scaleX = 1.3f - 0.3f * p; scaleY = 1.3f - 0.3f * p }
                     "pan_left" -> translationX = 60f * (0.5f - p)
