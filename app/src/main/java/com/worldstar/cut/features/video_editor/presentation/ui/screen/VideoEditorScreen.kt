@@ -705,13 +705,17 @@ private fun ToolPanel(
         shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
         shadowElevation = 8.dp
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(max = 220.dp)
-                .verticalScroll(rememberScrollState())
-                .padding(12.dp)
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(12.dp)
+            ) {
             // Drag handle indicator
             Box(
                 modifier = Modifier
@@ -864,9 +868,7 @@ private fun TextTool(
         "Cursive" to "cursive"
     )
 
-    Column(
-        modifier = Modifier.verticalScroll(rememberScrollState())
-    ) {
+    Column {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
@@ -1606,9 +1608,7 @@ private fun ImageOverlayTool(
         parseImageOverlays(clip?.imageOverlays)
     }
 
-    Column(
-        modifier = Modifier.verticalScroll(rememberScrollState())
-    ) {
+    Column {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
