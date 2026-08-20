@@ -7,15 +7,21 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.worldstar.cut.core.domain.result.Result
 import com.google.gson.Gson
+import com.worldstar.cut.features.video_editor.domain.model.AudioVolumeKeyframe
 import com.worldstar.cut.features.video_editor.domain.model.Clip
 import com.worldstar.cut.features.video_editor.domain.model.ImageOverlay
+import com.worldstar.cut.features.video_editor.domain.model.MotionSegment
 import com.worldstar.cut.features.video_editor.domain.model.Track
 import com.worldstar.cut.features.video_editor.domain.tracking.MotionTracker
 import com.worldstar.cut.features.video_editor.domain.usecase.*
-import com.worldstar.cut.features.video_editor.presentation.ui.screen.parseTextOverlays
-import com.worldstar.cut.features.video_editor.presentation.ui.screen.serializeTextOverlays
 import com.worldstar.cut.features.video_editor.presentation.ui.screen.parseImageOverlays
+import com.worldstar.cut.features.video_editor.presentation.ui.screen.parseMotionSegments
+import com.worldstar.cut.features.video_editor.presentation.ui.screen.parseTextOverlays
+import com.worldstar.cut.features.video_editor.presentation.ui.screen.parseVolumeKeyframes
 import com.worldstar.cut.features.video_editor.presentation.ui.screen.serializeImageOverlays
+import com.worldstar.cut.features.video_editor.presentation.ui.screen.serializeMotionSegments
+import com.worldstar.cut.features.video_editor.presentation.ui.screen.serializeTextOverlays
+import com.worldstar.cut.features.video_editor.presentation.ui.screen.serializeVolumeKeyframes
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -212,6 +218,72 @@ class VideoEditorViewModel @Inject constructor(
         val clip = _uiState.value.selectedClip ?: return
         viewModelScope.launch {
             updateClipUseCase(clip.copy(motionEffect = effect))
+        }
+    }
+
+    // ─── Volume keyframes (audio ducking) ─────────────────────────────────────
+
+    fun onVolumeKeyframeAdd(timeMs: Long, volume: Float) {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            val kfs = parseVolumeKeyframes(clip.volumeKeyframes).toMutableList()
+            kfs.add(AudioVolumeKeyframe(id = System.nanoTime(), timeMs = timeMs, volume = volume.coerceIn(0f, 2f)))
+            kfs.sortBy { it.timeMs }
+            updateClipUseCase(clip.copy(volumeKeyframes = serializeVolumeKeyframes(kfs)))
+        }
+    }
+
+    fun onVolumeKeyframeUpdate(id: Long, timeMs: Long, volume: Float) {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            val kfs = parseVolumeKeyframes(clip.volumeKeyframes).toMutableList()
+            val idx = kfs.indexOfFirst { it.id == id }
+            if (idx >= 0) {
+                kfs[idx] = kfs[idx].copy(timeMs = timeMs, volume = volume.coerceIn(0f, 2f))
+                kfs.sortBy { it.timeMs }
+                updateClipUseCase(clip.copy(volumeKeyframes = serializeVolumeKeyframes(kfs)))
+            }
+        }
+    }
+
+    fun onVolumeKeyframeDelete(id: Long) {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            val kfs = parseVolumeKeyframes(clip.volumeKeyframes).toMutableList()
+            kfs.removeAll { it.id == id }
+            updateClipUseCase(clip.copy(volumeKeyframes = serializeVolumeKeyframes(kfs)))
+        }
+    }
+
+    // ─── Motion segments (multi) ──────────────────────────────────────────────
+
+    fun onMotionSegmentAdd(effect: String, startMs: Long, durationMs: Long) {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            val segs = parseMotionSegments(clip.motionSegments).toMutableList()
+            segs.add(MotionSegment(id = System.nanoTime(), effect = effect, startMs = startMs, durationMs = durationMs))
+            updateClipUseCase(clip.copy(motionSegments = serializeMotionSegments(segs)))
+        }
+    }
+
+    fun onMotionSegmentUpdate(id: Long, effect: String, startMs: Long, durationMs: Long) {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            val segs = parseMotionSegments(clip.motionSegments).toMutableList()
+            val idx = segs.indexOfFirst { it.id == id }
+            if (idx >= 0) {
+                segs[idx] = segs[idx].copy(effect = effect, startMs = startMs, durationMs = durationMs)
+                updateClipUseCase(clip.copy(motionSegments = serializeMotionSegments(segs)))
+            }
+        }
+    }
+
+    fun onMotionSegmentDelete(id: Long) {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            val segs = parseMotionSegments(clip.motionSegments).toMutableList()
+            segs.removeAll { it.id == id }
+            updateClipUseCase(clip.copy(motionSegments = serializeMotionSegments(segs)))
         }
     }
 
