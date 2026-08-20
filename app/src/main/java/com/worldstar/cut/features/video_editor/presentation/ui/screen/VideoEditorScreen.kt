@@ -316,6 +316,7 @@ private fun VideoPreview(
     progress: Float,
     effectType: String? = null,
     motionEffect: String? = null,
+    cropX: Float = 0f,
     cropY: Float = 0f,
     cropW: Float = 1f,
     cropH: Float = 1f,
