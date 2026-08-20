@@ -5,7 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -329,8 +331,7 @@ private fun VideoPreview(
 
     Box(
         modifier = modifier
-            .background(Color.Black)
-            .then(if (!isImage) Modifier.clickable(onClick = onPlayPause) else Modifier),
+            .background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
         if (uri != null) {
@@ -467,6 +468,18 @@ private fun VideoPreview(
                     )
                 }
             }
+
+            // Deselect overlay when tapping empty preview area
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(selectedOverlayId, isImage) {
+                        detectTapGestures(onTap = {
+                            if (selectedOverlayId != null) onOverlaySelected(null)
+                            else if (!isImage) onPlayPause()
+                        })
+                    }
+            )
 
             // Text overlays (multiple, draggable, resizable, rotatable)
             val overlays = remember(textOverlaysJson) { parseTextOverlays(textOverlaysJson) }
@@ -1393,6 +1406,10 @@ private fun DraggableText(
                     scaleY = scale
                     rotationZ = angle
                 }
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { onSelect(overlayId) }
                 .pointerInput(overlayId) {
                     detectTransformGestures { _, pan, zoom, rotation ->
                         onSelect(overlayId)
@@ -1523,6 +1540,10 @@ private fun DraggableImage(
                     rotationZ = angle
                     alpha = opacity
                 }
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) { onSelect(overlayId) }
                 .pointerInput(overlayId) {
                     detectTransformGestures { _, pan, zoom, rotation ->
                         onSelect(overlayId)
