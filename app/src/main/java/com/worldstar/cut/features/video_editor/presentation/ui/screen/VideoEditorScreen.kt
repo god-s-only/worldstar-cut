@@ -600,8 +600,7 @@ private fun EditorToolsBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 8.dp, vertical = 6.dp)
-                .navigationBarsPadding(),
+                .padding(horizontal = 8.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             tools.forEach { item ->
