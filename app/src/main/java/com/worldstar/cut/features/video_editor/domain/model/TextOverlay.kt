@@ -8,5 +8,6 @@ data class TextOverlay(
     val sizeSp: Float = 24f,
     val rotation: Float = 0f,
     val color: Int = -1,
-    val fontFamily: String = "default"
+    val fontFamily: String = "default",
+    val animation: String = "none"
 )

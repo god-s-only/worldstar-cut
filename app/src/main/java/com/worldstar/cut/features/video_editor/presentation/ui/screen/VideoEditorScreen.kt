@@ -1869,7 +1869,8 @@ internal fun parseTextOverlays(json: String?): List<TextOverlay> {
                 sizeSp = obj.optDouble("sizeSp", 24.0).toFloat(),
                 rotation = obj.optDouble("rotation", 0.0).toFloat(),
                 color = obj.optInt("color", -1),
-                fontFamily = obj.optString("fontFamily", "default")
+                fontFamily = obj.optString("fontFamily", "default"),
+                animation = obj.optString("animation", "none")
             )
         }
     } catch (_: Exception) {
@@ -1889,6 +1890,7 @@ fun serializeTextOverlays(overlays: List<TextOverlay>): String {
             put("rotation", o.rotation.toDouble())
             put("color", o.color)
             put("fontFamily", o.fontFamily)
+            put("animation", o.animation)
         })
     }
     return arr.toString()
