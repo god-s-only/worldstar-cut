@@ -224,6 +224,8 @@ fun VideoEditorScreen(
                     onImageOverlayAdd = viewModel::onImageOverlayAdd,
                     onImageOverlayUpdate = viewModel::onImageOverlayTransformChanged,
                     onImageOverlayDelete = viewModel::onImageOverlayDelete,
+                    onImageOverlayAnimationChanged = viewModel::onImageOverlayAnimationChanged,
+                    onImageOverlayTimingChanged = viewModel::onImageOverlayTimingChanged,
                     onPickImage = { imageOverlayPickerLauncher.launch("image/*") },
                     onDelete = viewModel::onDeleteClip
                 )
@@ -554,9 +556,12 @@ private fun VideoPreview(
                 )
             }
 
-            // Image overlays
+            // Image overlays (with timing + CapCut animation)
             val imgOverlays = remember(imageOverlaysJson) { parseImageOverlays(imageOverlaysJson) }
             imgOverlays.forEach { overlay ->
+                val windowEnd = overlay.startMs + overlay.durationMs
+                if (playbackMs < overlay.startMs || playbackMs >= windowEnd) return@forEach
+                val localMs = (playbackMs - overlay.startMs).coerceAtLeast(0L)
                 DraggableImage(
                     overlayId = overlay.id,
                     imageUri = overlay.imageUri,
@@ -565,6 +570,9 @@ private fun VideoPreview(
                     sizeScale = overlay.sizeScale,
                     rotation = overlay.rotation,
                     opacity = overlay.opacity,
+                    animation = overlay.animation,
+                    playbackMs = localMs,
+                    isPlaying = isPlaying,
                     isSelected = selectedOverlayId == overlay.id,
                     onSelect = onOverlaySelected,
                     onTransformChanged = onImageOverlayTransformChanged
@@ -756,6 +764,8 @@ private fun ToolPanel(
     onImageOverlayAdd: (String) -> Unit,
     onImageOverlayUpdate: (Long, Float, Float, Float, Float) -> Unit,
     onImageOverlayDelete: (Long) -> Unit,
+    onImageOverlayAnimationChanged: (Long, String) -> Unit,
+    onImageOverlayTimingChanged: (Long, Long, Long) -> Unit,
     onPickImage: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -836,7 +846,9 @@ private fun ToolPanel(
                     onOverlayAdd = onImageOverlayAdd,
                     onOverlayUpdate = onImageOverlayUpdate,
                     onPickImage = onPickImage,
-                    onDelete = onImageOverlayDelete
+                    onDelete = onImageOverlayDelete,
+                    onAnimationChanged = onImageOverlayAnimationChanged,
+                    onTimingChanged = onImageOverlayTimingChanged
                 )
                 EditorTool.Speed -> SpeedTool(
                     clip = selectedClip,
@@ -1103,30 +1115,81 @@ private fun TextTool(
                 startMsState = selectedOverlay?.startMs?.toFloat() ?: 0f
                 durationMsState = selectedOverlay?.durationMs?.toFloat() ?: 3000f
             }
-            Text("Start: ${formatTime(startMsState.toLong())}", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
-            Slider(
-                value = startMsState / 1000f,
-                onValueChange = { v ->
-                    startMsState = v * 1000f
-                    val maxStart = (clipDuration - durationMsState).coerceAtLeast(0f)
-                    val clampedStart = startMsState.coerceIn(0f, maxStart)
-                    selectedOverlay?.let { onTimingChanged(it.id, clampedStart.toLong(), durationMsState.toLong()) }
-                },
-                valueRange = 0f..(clipDuration.toFloat() / 1000f).coerceAtLeast(0.5f),
-                colors = SliderDefaults.colors(thumbColor = WorldstarCyan, activeTrackColor = WorldstarCyan)
-            )
-            Text("Duration: ${formatTime(durationMsState.toLong())}", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
-            Slider(
-                value = durationMsState / 1000f,
-                onValueChange = { v ->
-                    durationMsState = v * 1000f
-                    val maxDur = (clipDuration - startMsState).coerceAtLeast(200f)
-                    val clampedDur = durationMsState.coerceIn(200f, maxDur)
-                    selectedOverlay?.let { onTimingChanged(it.id, startMsState.toLong(), clampedDur.toLong()) }
-                },
-                valueRange = 0.2f..((clipDuration.toFloat() / 1000f).coerceAtLeast(0.5f)),
-                colors = SliderDefaults.colors(thumbColor = WorldstarPink, activeTrackColor = WorldstarPink)
-            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Start", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark, modifier = Modifier.width(40.dp))
+                Slider(
+                    value = startMsState / 1000f,
+                    onValueChange = { v ->
+                        startMsState = v * 1000f
+                        val maxStart = (clipDuration - durationMsState).coerceAtLeast(0f)
+                        val clampedStart = startMsState.coerceIn(0f, maxStart)
+                        selectedOverlay?.let { onTimingChanged(it.id, clampedStart.toLong(), durationMsState.toLong()) }
+                    },
+                    valueRange = 0f..(clipDuration.toFloat() / 1000f).coerceAtLeast(0.5f),
+                    modifier = Modifier.weight(1f),
+                    colors = SliderDefaults.colors(thumbColor = WorldstarCyan, activeTrackColor = WorldstarCyan)
+                )
+                OutlinedTextField(
+                    value = String.format("%.1f", startMsState / 1000f),
+                    onValueChange = { str ->
+                        str.toFloatOrNull()?.let { f ->
+                            val ms = (f * 1000).coerceIn(0f, (clipDuration - durationMsState).coerceAtLeast(0f))
+                            startMsState = ms
+                            selectedOverlay?.let { onTimingChanged(it.id, ms.toLong(), durationMsState.toLong()) }
+                        }
+                    },
+                    modifier = Modifier.width(64.dp),
+                    textStyle = MaterialTheme.typography.labelSmall.copy(textAlign = TextAlign.Center),
+                    singleLine = true,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = WorldstarCyan,
+                        unfocusedBorderColor = SurfaceElevated,
+                        focusedTextColor = TextPrimaryDark,
+                        unfocusedTextColor = TextPrimaryDark
+                    )
+                )
+                Text("s", style = MaterialTheme.typography.labelSmall, color = TextDisabledDark)
+            }
+            Text("Start: ${formatTime(startMsState.toLong())}", style = MaterialTheme.typography.labelSmall, color = TextDisabledDark)
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Dur", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark, modifier = Modifier.width(40.dp))
+                Slider(
+                    value = durationMsState / 1000f,
+                    onValueChange = { v ->
+                        durationMsState = v * 1000f
+                        val maxDur = (clipDuration - startMsState).coerceAtLeast(200f)
+                        val clampedDur = durationMsState.coerceIn(200f, maxDur)
+                        selectedOverlay?.let { onTimingChanged(it.id, startMsState.toLong(), clampedDur.toLong()) }
+                    },
+                    valueRange = 0.2f..((clipDuration.toFloat() / 1000f).coerceAtLeast(0.5f)),
+                    modifier = Modifier.weight(1f),
+                    colors = SliderDefaults.colors(thumbColor = WorldstarPink, activeTrackColor = WorldstarPink)
+                )
+                OutlinedTextField(
+                    value = String.format("%.1f", durationMsState / 1000f),
+                    onValueChange = { str ->
+                        str.toFloatOrNull()?.let { f ->
+                            val ms = (f * 1000).coerceIn(200f, (clipDuration - startMsState).coerceAtLeast(200f))
+                            durationMsState = ms
+                            selectedOverlay?.let { onTimingChanged(it.id, startMsState.toLong(), ms.toLong()) }
+                        }
+                    },
+                    modifier = Modifier.width(64.dp),
+                    textStyle = MaterialTheme.typography.labelSmall.copy(textAlign = TextAlign.Center),
+                    singleLine = true,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = WorldstarPink,
+                        unfocusedBorderColor = SurfaceElevated,
+                        focusedTextColor = TextPrimaryDark,
+                        unfocusedTextColor = TextPrimaryDark
+                    )
+                )
+                Text("s", style = MaterialTheme.typography.labelSmall, color = TextDisabledDark)
+            }
+            Text("Duration: ${formatTime(durationMsState.toLong())}", style = MaterialTheme.typography.labelSmall, color = TextDisabledDark)
         } else {
             Spacer(Modifier.height(24.dp))
             Text(
@@ -1726,6 +1789,9 @@ private fun DraggableImage(
     sizeScale: Float,
     rotation: Float,
     opacity: Float = 1f,
+    animation: String = "none",
+    playbackMs: Long = 0L,
+    isPlaying: Boolean = false,
     isSelected: Boolean,
     onSelect: (Long) -> Unit,
     onTransformChanged: (Long, Float, Float, Float, Float) -> Unit
@@ -1742,6 +1808,18 @@ private fun DraggableImage(
         angle = rotation
     }
 
+    // CapCut animation for sticker (same set as text)
+    val animDuration = 600L
+    val animProgress = when {
+        animation == "none" -> 1f
+        isPlaying && playbackMs in 0..animDuration -> playbackMs.toFloat() / animDuration
+        isPlaying && playbackMs > animDuration -> 1f
+        else -> 1f
+    }
+    val glitchOffsetX = if (animation == "glitch" && animProgress < 1f) {
+        (kotlin.random.Random.nextFloat() - 0.5f) * 16f * (1f - animProgress)
+    } else 0f
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1757,10 +1835,28 @@ private fun DraggableImage(
                     )
                 }
                 .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
+                    var a = opacity
+                    var tx = 0f
+                    var ty = 0f
+                    var sFactor = 1f
+                    when (animation) {
+                        "fade" -> a = opacity * animProgress
+                        "slide_up" -> { ty = (1f - animProgress) * 80f; a = opacity * animProgress }
+                        "slide_down" -> { ty = -(1f - animProgress) * 80f; a = opacity * animProgress }
+                        "slide_left" -> { tx = (1f - animProgress) * 80f; a = opacity * animProgress }
+                        "slide_right" -> { tx = -(1f - animProgress) * 80f; a = opacity * animProgress }
+                        "scale" -> { sFactor = 0.3f + 0.7f * animProgress; a = opacity * animProgress }
+                        "glitch" -> { tx = glitchOffsetX; a = opacity * animProgress }
+                        "wave" -> { ty = kotlin.math.sin(animProgress * Math.PI * 4).toFloat() * 10f }
+                        "typewriter" -> { a = if (animProgress < 1f) 0f else opacity }
+                        else -> {}
+                    }
+                    alpha = a
+                    translationX = tx
+                    translationY = ty
+                    scaleX = scale * sFactor
+                    scaleY = scale * sFactor
                     rotationZ = angle
-                    alpha = opacity
                 }
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
@@ -1847,7 +1943,9 @@ private fun ImageOverlayTool(
     onOverlayAdd: (String) -> Unit,
     onOverlayUpdate: (Long, Float, Float, Float, Float) -> Unit,
     onPickImage: () -> Unit,
-    onDelete: (Long) -> Unit = {}
+    onDelete: (Long) -> Unit = {},
+    onAnimationChanged: (Long, String) -> Unit = { _, _ -> },
+    onTimingChanged: (Long, Long, Long) -> Unit = { _, _, _ -> }
 ) {
     val overlays = remember(clip?.imageOverlays) {
         parseImageOverlays(clip?.imageOverlays)
@@ -1910,6 +2008,117 @@ private fun ImageOverlayTool(
                 Spacer(Modifier.width(4.dp))
                 Text("Delete Sticker", style = MaterialTheme.typography.labelMedium)
             }
+
+            Spacer(Modifier.height(12.dp))
+            Text("Animation — CapCut", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
+            Spacer(Modifier.height(8.dp))
+            val stickerAnimOptions = listOf(
+                "None" to "none", "Fade" to "fade", "Slide Up" to "slide_up", "Slide Down" to "slide_down",
+                "Slide Left" to "slide_left", "Slide Right" to "slide_right", "Scale" to "scale",
+                "Glitch" to "glitch", "Wave" to "wave", "Typewriter" to "typewriter"
+            )
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(stickerAnimOptions) { (label, key) ->
+                    val isSelected = selectedOverlay.animation == key
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { onAnimationChanged(selectedOverlay.id, key) },
+                        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = WorldstarCyan,
+                            selectedLabelColor = Color.White,
+                            containerColor = SurfaceDark,
+                            labelColor = TextSecondaryDark
+                        )
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            Text("Timing", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
+            Spacer(Modifier.height(8.dp))
+            val clipDuration = clip?.trimmedDurationMs?.takeIf { it > 0 } ?: clip?.durationMs?.takeIf { it > 0 } ?: 5000L
+            var startMsState by remember(selectedOverlay.id) { mutableFloatStateOf(selectedOverlay.startMs.toFloat()) }
+            var durationMsState by remember(selectedOverlay.id) { mutableFloatStateOf(selectedOverlay.durationMs.toFloat()) }
+            LaunchedEffect(selectedOverlay.id, selectedOverlay.startMs, selectedOverlay.durationMs) {
+                startMsState = selectedOverlay.startMs.toFloat()
+                durationMsState = selectedOverlay.durationMs.toFloat()
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Start", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark, modifier = Modifier.width(40.dp))
+                Slider(
+                    value = startMsState / 1000f,
+                    onValueChange = { v ->
+                        startMsState = v * 1000f
+                        val maxStart = (clipDuration - durationMsState).coerceAtLeast(0f)
+                        val clamped = startMsState.coerceIn(0f, maxStart)
+                        onTimingChanged(selectedOverlay.id, clamped.toLong(), durationMsState.toLong())
+                    },
+                    valueRange = 0f..(clipDuration.toFloat() / 1000f).coerceAtLeast(0.5f),
+                    modifier = Modifier.weight(1f),
+                    colors = SliderDefaults.colors(thumbColor = WorldstarCyan, activeTrackColor = WorldstarCyan)
+                )
+                OutlinedTextField(
+                    value = String.format("%.1f", startMsState / 1000f),
+                    onValueChange = { str ->
+                        str.toFloatOrNull()?.let { f ->
+                            val ms = (f * 1000).coerceIn(0f, (clipDuration - durationMsState).coerceAtLeast(0f))
+                            startMsState = ms
+                            onTimingChanged(selectedOverlay.id, ms.toLong(), durationMsState.toLong())
+                        }
+                    },
+                    modifier = Modifier.width(64.dp),
+                    textStyle = MaterialTheme.typography.labelSmall.copy(textAlign = TextAlign.Center),
+                    singleLine = true,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = WorldstarCyan,
+                        unfocusedBorderColor = SurfaceElevated,
+                        focusedTextColor = TextPrimaryDark,
+                        unfocusedTextColor = TextPrimaryDark
+                    )
+                )
+                Text("s", style = MaterialTheme.typography.labelSmall, color = TextDisabledDark)
+            }
+            Text("Start: ${formatTime(startMsState.toLong())}", style = MaterialTheme.typography.labelSmall, color = TextDisabledDark)
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Dur", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark, modifier = Modifier.width(40.dp))
+                Slider(
+                    value = durationMsState / 1000f,
+                    onValueChange = { v ->
+                        durationMsState = v * 1000f
+                        val maxDur = (clipDuration - startMsState).coerceAtLeast(200f)
+                        val clamped = durationMsState.coerceIn(200f, maxDur)
+                        onTimingChanged(selectedOverlay.id, startMsState.toLong(), clamped.toLong())
+                    },
+                    valueRange = 0.2f..((clipDuration.toFloat() / 1000f).coerceAtLeast(0.5f)),
+                    modifier = Modifier.weight(1f),
+                    colors = SliderDefaults.colors(thumbColor = WorldstarPink, activeTrackColor = WorldstarPink)
+                )
+                OutlinedTextField(
+                    value = String.format("%.1f", durationMsState / 1000f),
+                    onValueChange = { str ->
+                        str.toFloatOrNull()?.let { f ->
+                            val ms = (f * 1000).coerceIn(200f, (clipDuration - startMsState).coerceAtLeast(200f))
+                            durationMsState = ms
+                            onTimingChanged(selectedOverlay.id, startMsState.toLong(), ms.toLong())
+                        }
+                    },
+                    modifier = Modifier.width(64.dp),
+                    textStyle = MaterialTheme.typography.labelSmall.copy(textAlign = TextAlign.Center),
+                    singleLine = true,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = WorldstarPink,
+                        unfocusedBorderColor = SurfaceElevated,
+                        focusedTextColor = TextPrimaryDark,
+                        unfocusedTextColor = TextPrimaryDark
+                    )
+                )
+                Text("s", style = MaterialTheme.typography.labelSmall, color = TextDisabledDark)
+            }
+            Text("Duration: ${formatTime(durationMsState.toLong())}", style = MaterialTheme.typography.labelSmall, color = TextDisabledDark)
         }
 
         Spacer(Modifier.height(16.dp))
@@ -2210,7 +2419,10 @@ internal fun parseImageOverlays(json: String?): List<ImageOverlay> {
                 posY = obj.optDouble("posY", 0.5).toFloat(),
                 sizeScale = obj.optDouble("sizeScale", 0.3).toFloat(),
                 rotation = obj.optDouble("rotation", 0.0).toFloat(),
-                opacity = obj.optDouble("opacity", 1.0).toFloat()
+                opacity = obj.optDouble("opacity", 1.0).toFloat(),
+                animation = obj.optString("animation", "none"),
+                startMs = obj.optLong("startMs", 0L),
+                durationMs = obj.optLong("durationMs", 3000L)
             )
         }
     } catch (_: Exception) {
@@ -2229,6 +2441,9 @@ fun serializeImageOverlays(overlays: List<ImageOverlay>): String {
             put("sizeScale", o.sizeScale.toDouble())
             put("rotation", o.rotation.toDouble())
             put("opacity", o.opacity.toDouble())
+            put("animation", o.animation)
+            put("startMs", o.startMs)
+            put("durationMs", o.durationMs)
         })
     }
     return arr.toString()

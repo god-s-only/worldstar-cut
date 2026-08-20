@@ -7,5 +7,8 @@ data class ImageOverlay(
     val posY: Float = 0.5f,
     val sizeScale: Float = 0.3f,
     val rotation: Float = 0f,
-    val opacity: Float = 1f
+    val opacity: Float = 1f,
+    val animation: String = "none",
+    val startMs: Long = 0L,
+    val durationMs: Long = 3000L
 )

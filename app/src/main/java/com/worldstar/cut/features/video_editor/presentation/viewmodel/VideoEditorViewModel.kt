@@ -391,12 +391,18 @@ class VideoEditorViewModel @Inject constructor(
         viewModelScope.launch {
             val persistedUri = persistStickerImage(imageUri)
             val existing = parseImageOverlays(clip.imageOverlays).toMutableList()
+            val clipDuration = clip.trimmedDurationMs.takeIf { it > 0 } ?: clip.durationMs.takeIf { it > 0 } ?: 5000L
+            val playhead = _uiState.value.playbackPositionMs.coerceIn(0L, (clipDuration - 200L).coerceAtLeast(0L))
+            val duration = minOf(3000L, (clipDuration - playhead).coerceAtLeast(500L))
             val newOverlay = ImageOverlay(
                 id = System.nanoTime(),
                 imageUri = persistedUri,
                 posX = 0.5f,
                 posY = 0.5f,
-                sizeScale = 0.3f
+                sizeScale = 0.3f,
+                animation = "none",
+                startMs = playhead,
+                durationMs = duration
             )
             existing.add(newOverlay)
             val json = serializeImageOverlays(existing)
@@ -454,6 +460,32 @@ class VideoEditorViewModel @Inject constructor(
             val json = serializeImageOverlays(overlays)
             updateClipUseCase(clip.copy(imageOverlays = json))
             _uiState.update { it.copy(selectedTextOverlayId = null) }
+        }
+    }
+
+    fun onImageOverlayAnimationChanged(overlayId: Long, animation: String) {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            val overlays = parseImageOverlays(clip.imageOverlays).toMutableList()
+            val idx = overlays.indexOfFirst { it.id == overlayId }
+            if (idx >= 0) {
+                overlays[idx] = overlays[idx].copy(animation = animation)
+                val json = serializeImageOverlays(overlays)
+                updateClipUseCase(clip.copy(imageOverlays = json))
+            }
+        }
+    }
+
+    fun onImageOverlayTimingChanged(overlayId: Long, startMs: Long, durationMs: Long) {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            val overlays = parseImageOverlays(clip.imageOverlays).toMutableList()
+            val idx = overlays.indexOfFirst { it.id == overlayId }
+            if (idx >= 0) {
+                overlays[idx] = overlays[idx].copy(startMs = startMs.coerceAtLeast(0L), durationMs = durationMs.coerceAtLeast(200L))
+                val json = serializeImageOverlays(overlays)
+                updateClipUseCase(clip.copy(imageOverlays = json))
+            }
         }
     }
 
