@@ -50,5 +50,6 @@ data class ClipEntity(
     val fontFamily: String = "default",
     val textOverlays: String? = null,
     val motionTrack: String? = null,
-    val imageOverlays: String? = null
+    val imageOverlays: String? = null,
+    val motionEffect: String? = null
 )

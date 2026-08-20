@@ -26,7 +26,7 @@ import com.worldstar.cut.features.export.data.local.db.ExportHistoryEntity
         ClipEntity::class,
         ExportHistoryEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = true
 )
 @TypeConverters(RoomTypeConverters::class)
@@ -92,6 +92,12 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_8_9 = object : Migration(8, 9) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE clips ADD COLUMN imageOverlays TEXT DEFAULT NULL")
+            }
+        }
+
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE clips ADD COLUMN motionEffect TEXT DEFAULT NULL")
             }
         }
     }
