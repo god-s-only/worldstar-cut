@@ -225,9 +225,16 @@ fun VideoEditorScreen(
                         onTrimStartChanged = viewModel::onTrimStartChanged,
                         onTrimEndChanged = viewModel::onTrimEndChanged,
                         onVolumeChanged = viewModel::onClipVolumeChanged,
+                        onVolumeKeyframeAdd = viewModel::onVolumeKeyframeAdd,
+                        onVolumeKeyframeUpdate = viewModel::onVolumeKeyframeUpdate,
+                        onVolumeKeyframeDelete = viewModel::onVolumeKeyframeDelete,
+                        playbackMs = uiState.playbackPositionMs,
                         onSpeedChanged = viewModel::onClipSpeedChanged,
                         onEffectChanged = viewModel::onClipEffectChanged,
                         onMotionEffectChanged = viewModel::onClipMotionEffectChanged,
+                        onMotionSegmentAdd = viewModel::onMotionSegmentAdd,
+                        onMotionSegmentUpdate = viewModel::onMotionSegmentUpdate,
+                        onMotionSegmentDelete = viewModel::onMotionSegmentDelete,
                         onTransitionChanged = viewModel::onClipTransitionChanged,
                         onCropChanged = viewModel::onClipCropChanged,
                         onOverlayAdd = viewModel::onTextOverlayAdd,
@@ -789,9 +796,16 @@ private fun ToolPanel(
     onTrimStartChanged: (Long) -> Unit,
     onTrimEndChanged: (Long) -> Unit,
     onVolumeChanged: (Float) -> Unit,
+    onVolumeKeyframeAdd: (Long, Float) -> Unit,
+    onVolumeKeyframeUpdate: (Long, Long, Float) -> Unit,
+    onVolumeKeyframeDelete: (Long) -> Unit,
+    playbackMs: Long = 0L,
     onSpeedChanged: (Float) -> Unit,
     onEffectChanged: (String?) -> Unit,
     onMotionEffectChanged: (String?) -> Unit,
+    onMotionSegmentAdd: (String, Long, Long) -> Unit,
+    onMotionSegmentUpdate: (Long, String, Long, Long) -> Unit,
+    onMotionSegmentDelete: (Long) -> Unit,
     onTransitionChanged: (String?) -> Unit,
     onCropChanged: (Float, Float, Float, Float) -> Unit,
     onOverlayAdd: () -> Unit,
@@ -867,7 +881,11 @@ private fun ToolPanel(
                 )
                 EditorTool.MotionEffect -> MotionEffectTool(
                     clip = selectedClip,
-                    onMotionEffectChanged = onMotionEffectChanged
+                    playbackMs = playbackMs,
+                    onMotionEffectChanged = onMotionEffectChanged,
+                    onSegmentAdd = onMotionSegmentAdd,
+                    onSegmentUpdate = onMotionSegmentUpdate,
+                    onSegmentDelete = onMotionSegmentDelete
                 )
                 EditorTool.Transition -> TransitionTool(
                     clip = selectedClip,
@@ -899,7 +917,11 @@ private fun ToolPanel(
                 )
                 EditorTool.Volume -> VolumeTool(
                     clip = selectedClip,
-                    onVolumeChanged = onVolumeChanged
+                    playbackMs = playbackMs,
+                    onVolumeChanged = onVolumeChanged,
+                    onKeyframeAdd = onVolumeKeyframeAdd,
+                    onKeyframeUpdate = onVolumeKeyframeUpdate,
+                    onKeyframeDelete = onVolumeKeyframeDelete
                 )
                 EditorTool.Adjust -> AdjustTool(onDelete = onDelete)
                 EditorTool.None -> {}
@@ -1279,7 +1301,11 @@ private fun EffectsTool(
 @Composable
 private fun MotionEffectTool(
     clip: Clip?,
-    onMotionEffectChanged: (String?) -> Unit
+    playbackMs: Long = 0L,
+    onMotionEffectChanged: (String?) -> Unit,
+    onSegmentAdd: (String, Long, Long) -> Unit = { _, _, _ -> },
+    onSegmentUpdate: (Long, String, Long, Long) -> Unit = { _, _, _, _ -> },
+    onSegmentDelete: (Long) -> Unit = {}
 ) {
     val effects = listOf(
         "None" to "none",
@@ -1297,12 +1323,15 @@ private fun MotionEffectTool(
         "Parallax" to "parallax"
     )
     val current = clip?.motionEffect ?: "none"
+    val segments = remember(clip?.motionSegments) { parseMotionSegments(clip?.motionSegments) }
+    var selectedSegId by remember { mutableStateOf<Long?>(null) }
+    val selectedSeg = remember(segments, selectedSegId) { segments.firstOrNull { it.id == selectedSegId } }
 
     Column {
-        Text("Motion — Advanced", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
+        Text("Motion — Single (legacy)", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
         Spacer(Modifier.height(4.dp))
-        Text("Applies to entire clip over playback", style = MaterialTheme.typography.labelSmall, color = TextDisabledDark)
-        Spacer(Modifier.height(12.dp))
+        Text("Applies to entire clip", style = MaterialTheme.typography.labelSmall, color = TextDisabledDark)
+        Spacer(Modifier.height(8.dp))
 
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(effects) { (label, key) ->
@@ -1317,6 +1346,153 @@ private fun MotionEffectTool(
                         labelColor = TextSecondaryDark
                     )
                 )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+        Divider(color = TextDisabledDark.copy(alpha = 0.2f))
+        Spacer(Modifier.height(12.dp))
+
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("Multi Motion (timeline)", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
+            Spacer(Modifier.weight(1f))
+            FilledTonalButton(
+                onClick = {
+                    val clipDur = clip?.trimmedDurationMs?.takeIf { it > 0 } ?: clip?.durationMs?.takeIf { it > 0 } ?: 5000L
+                    val start = playbackMs.coerceIn(0L, (clipDur - 500L).coerceAtLeast(0L))
+                    val dur = minOf(2000L, (clipDur - start).coerceAtLeast(500L))
+                    onSegmentAdd("zoom_in", start, dur)
+                },
+                colors = ButtonDefaults.filledTonalButtonColors(containerColor = WorldstarCyan.copy(alpha = 0.2f), contentColor = WorldstarCyan),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("At ${formatTime(playbackMs)}", style = MaterialTheme.typography.labelSmall)
+            }
+        }
+
+        if (segments.isEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "No segments — tap + to add effect at playhead. Each has its own time window.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextDisabledDark
+            )
+        } else {
+            Spacer(Modifier.height(8.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(segments) { seg ->
+                    val isSelected = seg.id == selectedSegId
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { selectedSegId = if (isSelected) null else seg.id },
+                        label = { Text("${seg.effect.replace("_", " ")} • ${formatTime(seg.startMs)}", style = MaterialTheme.typography.labelSmall) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = WorldstarCyan,
+                            selectedLabelColor = Color.White,
+                            containerColor = SurfaceDark,
+                            labelColor = TextSecondaryDark
+                        )
+                    )
+                }
+            }
+
+            if (selectedSeg != null) {
+                Spacer(Modifier.height(12.dp))
+                Text("Effect", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
+                Spacer(Modifier.height(6.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(effects.filter { it.second != "none" }) { (label, key) ->
+                        FilterChip(
+                            selected = selectedSeg.effect == key,
+                            onClick = { onSegmentUpdate(selectedSeg.id, key, selectedSeg.startMs, selectedSeg.durationMs) },
+                            label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = WorldstarPurpleLight,
+                                selectedLabelColor = Color.White,
+                                containerColor = SurfaceDark,
+                                labelColor = TextSecondaryDark
+                            )
+                        )
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                val clipDur = clip?.trimmedDurationMs?.takeIf { it > 0 } ?: clip?.durationMs?.takeIf { it > 0 } ?: 5000L
+                var startState by remember(selectedSeg.id) { mutableFloatStateOf(selectedSeg.startMs.toFloat()) }
+                var durState by remember(selectedSeg.id) { mutableFloatStateOf(selectedSeg.durationMs.toFloat()) }
+                LaunchedEffect(selectedSeg.id, selectedSeg.startMs, selectedSeg.durationMs) {
+                    startState = selectedSeg.startMs.toFloat()
+                    durState = selectedSeg.durationMs.toFloat()
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Start", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark, modifier = Modifier.width(36.dp))
+                    Slider(
+                        value = startState / 1000f,
+                        onValueChange = { v ->
+                            startState = v * 1000f
+                            val maxStart = (clipDur - durState).coerceAtLeast(0f)
+                            val clamped = startState.coerceIn(0f, maxStart)
+                            onSegmentUpdate(selectedSeg.id, selectedSeg.effect, clamped.toLong(), durState.toLong())
+                        },
+                        valueRange = 0f..(clipDur.toFloat() / 1000f).coerceAtLeast(0.5f),
+                        modifier = Modifier.weight(1f),
+                        colors = SliderDefaults.colors(thumbColor = WorldstarCyan, activeTrackColor = WorldstarCyan)
+                    )
+                    OutlinedTextField(
+                        value = String.format("%.1f", startState / 1000f),
+                        onValueChange = { str -> str.toFloatOrNull()?.let { f -> val ms = (f * 1000).coerceIn(0f, (clipDur - durState).coerceAtLeast(0f)); startState = ms; onSegmentUpdate(selectedSeg.id, selectedSeg.effect, ms.toLong(), durState.toLong()) } },
+                        modifier = Modifier.width(64.dp),
+                        textStyle = MaterialTheme.typography.labelSmall.copy(textAlign = TextAlign.Center),
+                        singleLine = true,
+                        shape = RoundedCornerShape(8.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = WorldstarCyan,
+                            unfocusedBorderColor = SurfaceElevated,
+                            focusedTextColor = TextPrimaryDark,
+                            unfocusedTextColor = TextPrimaryDark
+                        )
+                    )
+                    Text("s", style = MaterialTheme.typography.labelSmall, color = TextDisabledDark)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Dur", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark, modifier = Modifier.width(36.dp))
+                    Slider(
+                        value = durState / 1000f,
+                        onValueChange = { v ->
+                            durState = v * 1000f
+                            val maxDur = (clipDur - startState).coerceAtLeast(200f)
+                            val clamped = durState.coerceIn(200f, maxDur)
+                            onSegmentUpdate(selectedSeg.id, selectedSeg.effect, startState.toLong(), clamped.toLong())
+                        },
+                        valueRange = 0.2f..((clipDur.toFloat() / 1000f).coerceAtLeast(0.5f)),
+                        modifier = Modifier.weight(1f),
+                        colors = SliderDefaults.colors(thumbColor = WorldstarPink, activeTrackColor = WorldstarPink)
+                    )
+                    OutlinedTextField(
+                        value = String.format("%.1f", durState / 1000f),
+                        onValueChange = { str -> str.toFloatOrNull()?.let { f -> val ms = (f * 1000).coerceIn(200f, (clipDur - startState).coerceAtLeast(200f)); durState = ms; onSegmentUpdate(selectedSeg.id, selectedSeg.effect, startState.toLong(), ms.toLong()) } },
+                        modifier = Modifier.width(64.dp),
+                        textStyle = MaterialTheme.typography.labelSmall.copy(textAlign = TextAlign.Center),
+                        singleLine = true,
+                        shape = RoundedCornerShape(8.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = WorldstarPink,
+                            unfocusedBorderColor = SurfaceElevated,
+                            focusedTextColor = TextPrimaryDark,
+                            unfocusedTextColor = TextPrimaryDark
+                        )
+                    )
+                    Text("s", style = MaterialTheme.typography.labelSmall, color = TextDisabledDark)
+                }
+                TextButton(
+                    onClick = { onSegmentDelete(selectedSeg.id); selectedSegId = null },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Delete segment", style = MaterialTheme.typography.labelMedium)
+                }
             }
         }
     }
@@ -1573,9 +1749,16 @@ private fun SpeedTool(
 @Composable
 private fun VolumeTool(
     clip: Clip?,
-    onVolumeChanged: (Float) -> Unit
+    playbackMs: Long = 0L,
+    onVolumeChanged: (Float) -> Unit,
+    onKeyframeAdd: (Long, Float) -> Unit = { _, _ -> },
+    onKeyframeUpdate: (Long, Long, Float) -> Unit = { _, _, _ -> },
+    onKeyframeDelete: (Long) -> Unit = {}
 ) {
     var volume by remember(clip) { mutableFloatStateOf(clip?.volume ?: 1f) }
+    val keyframes = remember(clip?.volumeKeyframes) { parseVolumeKeyframes(clip?.volumeKeyframes) }
+    var selectedKfId by remember { mutableStateOf<Long?>(null) }
+    val selectedKf = remember(keyframes, selectedKfId) { keyframes.firstOrNull { it.id == selectedKfId } }
 
     Column {
         Text("Volume", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
@@ -1610,12 +1793,122 @@ private fun VolumeTool(
         }
 
         Text(
-            text = "${(volume * 100).roundToInt()}%",
+            text = "${(volume * 100).roundToInt()}% — base",
             style = MaterialTheme.typography.labelMedium,
             color = TextSecondaryDark,
             modifier = Modifier.fillMaxWidth(),
             textAlign = TextAlign.Center
         )
+
+        Spacer(Modifier.height(16.dp))
+        Divider(color = TextDisabledDark.copy(alpha = 0.2f))
+        Spacer(Modifier.height(12.dp))
+
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text("Ducking Keyframes", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
+            Spacer(Modifier.weight(1f))
+            FilledTonalButton(
+                onClick = { onKeyframeAdd(playbackMs, volume) },
+                colors = ButtonDefaults.filledTonalButtonColors(containerColor = WorldstarCyan.copy(alpha = 0.2f), contentColor = WorldstarCyan),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("At ${formatTime(playbackMs)}", style = MaterialTheme.typography.labelSmall)
+            }
+        }
+
+        if (keyframes.isEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "No keyframes — tap + to add volume point at playhead. Volume will lerp between points.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextDisabledDark
+            )
+        } else {
+            Spacer(Modifier.height(8.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(keyframes) { kf ->
+                    val isSelected = kf.id == selectedKfId
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { selectedKfId = if (isSelected) null else kf.id },
+                        label = { Text("${formatTime(kf.timeMs)} • ${(kf.volume * 100).roundToInt()}%", style = MaterialTheme.typography.labelSmall) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = WorldstarCyan,
+                            selectedLabelColor = Color.White,
+                            containerColor = SurfaceDark,
+                            labelColor = TextSecondaryDark
+                        )
+                    )
+                }
+            }
+
+            if (selectedKf != null) {
+                Spacer(Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Time", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark, modifier = Modifier.width(36.dp))
+                    Slider(
+                        value = selectedKf.timeMs.toFloat() / 1000f,
+                        onValueChange = { v ->
+                            val ms = (v * 1000).toLong()
+                            onKeyframeUpdate(selectedKf.id, ms, selectedKf.volume)
+                        },
+                        valueRange = 0f..((clip?.trimmedDurationMs?.takeIf { it > 0 } ?: 5000L).toFloat() / 1000f),
+                        modifier = Modifier.weight(1f),
+                        colors = SliderDefaults.colors(thumbColor = WorldstarCyan, activeTrackColor = WorldstarCyan)
+                    )
+                    OutlinedTextField(
+                        value = String.format("%.1f", selectedKf.timeMs / 1000f),
+                        onValueChange = { str -> str.toFloatOrNull()?.let { f -> onKeyframeUpdate(selectedKf.id, (f * 1000).toLong(), selectedKf.volume) } },
+                        modifier = Modifier.width(64.dp),
+                        textStyle = MaterialTheme.typography.labelSmall.copy(textAlign = TextAlign.Center),
+                        singleLine = true,
+                        shape = RoundedCornerShape(8.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = WorldstarCyan,
+                            unfocusedBorderColor = SurfaceElevated,
+                            focusedTextColor = TextPrimaryDark,
+                            unfocusedTextColor = TextPrimaryDark
+                        )
+                    )
+                    Text("s", style = MaterialTheme.typography.labelSmall, color = TextDisabledDark)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Vol", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark, modifier = Modifier.width(36.dp))
+                    Slider(
+                        value = selectedKf.volume,
+                        onValueChange = { v -> onKeyframeUpdate(selectedKf.id, selectedKf.timeMs, v) },
+                        valueRange = 0f..2f,
+                        modifier = Modifier.weight(1f),
+                        colors = SliderDefaults.colors(thumbColor = WorldstarPink, activeTrackColor = WorldstarPink)
+                    )
+                    OutlinedTextField(
+                        value = "${(selectedKf.volume * 100).roundToInt()}",
+                        onValueChange = { str -> str.toIntOrNull()?.let { i -> onKeyframeUpdate(selectedKf.id, selectedKf.timeMs, (i / 100f).coerceIn(0f, 2f)) } },
+                        modifier = Modifier.width(64.dp),
+                        textStyle = MaterialTheme.typography.labelSmall.copy(textAlign = TextAlign.Center),
+                        singleLine = true,
+                        shape = RoundedCornerShape(8.dp),
+                        suffix = { Text("%", style = MaterialTheme.typography.labelSmall, color = TextDisabledDark) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = WorldstarPink,
+                            unfocusedBorderColor = SurfaceElevated,
+                            focusedTextColor = TextPrimaryDark,
+                            unfocusedTextColor = TextPrimaryDark
+                        )
+                    )
+                }
+                TextButton(
+                    onClick = { onKeyframeDelete(selectedKf.id); selectedKfId = null },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Delete keyframe", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
     }
 }
 
