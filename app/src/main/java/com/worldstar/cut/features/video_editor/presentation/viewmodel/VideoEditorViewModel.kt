@@ -237,13 +237,19 @@ class VideoEditorViewModel @Inject constructor(
         val clip = _uiState.value.selectedClip ?: return
         viewModelScope.launch {
             val existing = parseTextOverlays(clip.textOverlays).toMutableList()
+            val clipDuration = clip.trimmedDurationMs.takeIf { it > 0 } ?: clip.durationMs.takeIf { it > 0 } ?: 5000L
+            val playhead = _uiState.value.playbackPositionMs.coerceIn(0L, (clipDuration - 200L).coerceAtLeast(0L))
+            val defaultDur = 3000L
+            val duration = minOf(defaultDur, (clipDuration - playhead).coerceAtLeast(500L))
             val newOverlay = com.worldstar.cut.features.video_editor.domain.model.TextOverlay(
                 id = System.nanoTime(),
                 text = "New Text",
                 posX = 0.5f,
                 posY = 0.5f,
                 sizeSp = 24f,
-                color = android.graphics.Color.WHITE
+                color = android.graphics.Color.WHITE,
+                startMs = playhead,
+                durationMs = duration
             )
             existing.add(newOverlay)
             val json = serializeTextOverlays(existing)
@@ -288,6 +294,30 @@ class VideoEditorViewModel @Inject constructor(
                 val json = serializeTextOverlays(overlays)
                 updateClipUseCase(clip.copy(textOverlays = json))
             }
+        }
+    }
+
+    fun onTextOverlayTimingChanged(overlayId: Long, startMs: Long, durationMs: Long) {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            val overlays = parseTextOverlays(clip.textOverlays).toMutableList()
+            val idx = overlays.indexOfFirst { it.id == overlayId }
+            if (idx >= 0) {
+                overlays[idx] = overlays[idx].copy(startMs = startMs.coerceAtLeast(0L), durationMs = durationMs.coerceAtLeast(200L))
+                val json = serializeTextOverlays(overlays)
+                updateClipUseCase(clip.copy(textOverlays = json))
+            }
+        }
+    }
+
+    fun onTextOverlayDelete(overlayId: Long) {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            val overlays = parseTextOverlays(clip.textOverlays).toMutableList()
+            overlays.removeAll { it.id == overlayId }
+            val json = serializeTextOverlays(overlays)
+            updateClipUseCase(clip.copy(textOverlays = json))
+            _uiState.update { it.copy(selectedTextOverlayId = null) }
         }
     }
 

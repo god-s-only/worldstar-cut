@@ -490,6 +490,11 @@ private fun VideoPreview(
                 } else null
             }
             overlays.forEach { overlay ->
+                // Only show if playback is within overlay's time window
+                val windowEnd = overlay.startMs + overlay.durationMs
+                if (playbackMs < overlay.startMs || playbackMs >= windowEnd) return@forEach
+                val localMs = (playbackMs - overlay.startMs).coerceAtLeast(0L)
+
                 val trackedPos = if (motionTrack != null && isPlaying) {
                     val frames = motionTrack.frames
                     if (frames.isNotEmpty()) {
@@ -509,7 +514,7 @@ private fun VideoPreview(
                     color = overlay.color,
                     fontFamilyName = overlay.fontFamily,
                     animation = overlay.animation,
-                    playbackMs = playbackMs,
+                    playbackMs = localMs,
                     isPlaying = isPlaying,
                     isSelected = selectedOverlayId == overlay.id,
                     onSelect = onOverlaySelected,
