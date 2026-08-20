@@ -51,5 +51,7 @@ data class ClipEntity(
     val textOverlays: String? = null,
     val motionTrack: String? = null,
     val imageOverlays: String? = null,
-    val motionEffect: String? = null
+    val motionEffect: String? = null,
+    val volumeKeyframes: String? = null,
+    val motionSegments: String? = null
 )
