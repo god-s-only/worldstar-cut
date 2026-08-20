@@ -226,7 +226,7 @@ fun VideoEditorScreen(
                 )
             }
 
-            // Compact Timeline
+            // Compact Timeline + text track
             Timeline(
                 clips = uiState.videoClips,
                 selectedClipId = uiState.selectedClipId,
@@ -237,9 +237,12 @@ fun VideoEditorScreen(
                 onSeek = viewModel::onSeekTo,
                 onZoomChanged = viewModel::onZoomChanged,
                 onAddMedia = viewModel::onAddMediaClicked,
+                selectedClip = uiState.selectedClip,
+                selectedTextOverlayId = uiState.selectedTextOverlayId,
+                onTextOverlaySelected = viewModel::onTextOverlaySelected,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(80.dp)
+                    .height(110.dp)
             )
 
             // Bottom Toolbar (fixed at bottom)
@@ -1843,6 +1846,9 @@ private fun Timeline(
     onSeek: (Long) -> Unit,
     onZoomChanged: (Float) -> Unit,
     onAddMedia: () -> Unit = {},
+    selectedClip: Clip? = null,
+    selectedTextOverlayId: Long? = null,
+    onTextOverlaySelected: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -1978,6 +1984,64 @@ private fun Timeline(
                         .width(2.dp)
                         .background(TimelinePlayhead)
                 )
+            }
+        }
+
+        // Text overlay track (Both — visual timeline blocks)
+        if (selectedClip != null) {
+            val textOverlays = remember(selectedClip.textOverlays) { parseTextOverlays(selectedClip.textOverlays) }
+            if (textOverlays.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(26.dp)
+                        .padding(horizontal = 8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                    ) {
+                        val totalWidth = (totalDurationMs.coerceAtLeast(1000L) / 1000f * 36f * zoomLevel).dp.coerceAtLeast(200.dp)
+                        Box(modifier = Modifier.width(totalWidth).height(26.dp)) {
+                            textOverlays.forEach { overlay ->
+                                val isSelected = overlay.id == selectedTextOverlayId
+                                val offsetX = ((overlay.startMs / 1000f) * 36f * zoomLevel).dp
+                                val barWidth = ((overlay.durationMs / 1000f) * 36f * zoomLevel).dp.coerceAtLeast(24.dp)
+                                Box(
+                                    modifier = Modifier
+                                        .offset(x = offsetX)
+                                        .width(barWidth)
+                                        .height(18.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(if (isSelected) WorldstarCyan else WorldstarPurpleLight.copy(alpha = 0.6f))
+                                        .border(if (isSelected) 1.dp else 0.dp, Color.White, RoundedCornerShape(4.dp))
+                                        .clickable { onTextOverlaySelected(overlay.id) }
+                                        .padding(horizontal = 4.dp),
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+                                    Text(
+                                        text = overlay.text.take(12),
+                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 7.sp),
+                                        color = Color.White,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                            if (totalDurationMs > 0) {
+                                val px = (playbackPositionMs.toFloat() / totalDurationMs) * (totalDurationMs / 1000f * 36f * zoomLevel)
+                                Box(
+                                    modifier = Modifier
+                                        .offset(x = px.dp)
+                                        .fillMaxHeight()
+                                        .width(1.dp)
+                                        .background(WorldstarPink.copy(alpha = 0.5f))
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
