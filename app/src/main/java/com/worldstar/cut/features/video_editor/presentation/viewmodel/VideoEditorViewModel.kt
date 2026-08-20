@@ -446,6 +446,17 @@ class VideoEditorViewModel @Inject constructor(
         }
     }
 
+    fun onImageOverlayDelete(overlayId: Long) {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            val overlays = parseImageOverlays(clip.imageOverlays).toMutableList()
+            overlays.removeAll { it.id == overlayId }
+            val json = serializeImageOverlays(overlays)
+            updateClipUseCase(clip.copy(imageOverlays = json))
+            _uiState.update { it.copy(selectedTextOverlayId = null) }
+        }
+    }
+
     fun onAddMediaClicked() {
         val currentProjectId = _uiState.value.project?.id ?: return
         viewModelScope.launch {

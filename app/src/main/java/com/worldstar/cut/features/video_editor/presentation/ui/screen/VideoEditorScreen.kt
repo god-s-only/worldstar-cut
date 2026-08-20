@@ -223,6 +223,7 @@ fun VideoEditorScreen(
                     onCancelTracking = viewModel::onCancelMotionTracking,
                     onImageOverlayAdd = viewModel::onImageOverlayAdd,
                     onImageOverlayUpdate = viewModel::onImageOverlayTransformChanged,
+                    onImageOverlayDelete = viewModel::onImageOverlayDelete,
                     onPickImage = { imageOverlayPickerLauncher.launch("image/*") },
                     onDelete = viewModel::onDeleteClip
                 )
@@ -754,6 +755,7 @@ private fun ToolPanel(
     onCancelTracking: () -> Unit,
     onImageOverlayAdd: (String) -> Unit,
     onImageOverlayUpdate: (Long, Float, Float, Float, Float) -> Unit,
+    onImageOverlayDelete: (Long) -> Unit,
     onPickImage: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -833,7 +835,8 @@ private fun ToolPanel(
                     selectedOverlayId = selectedOverlayId,
                     onOverlayAdd = onImageOverlayAdd,
                     onOverlayUpdate = onImageOverlayUpdate,
-                    onPickImage = onPickImage
+                    onPickImage = onPickImage,
+                    onDelete = onImageOverlayDelete
                 )
                 EditorTool.Speed -> SpeedTool(
                     clip = selectedClip,
@@ -1843,11 +1846,13 @@ private fun ImageOverlayTool(
     selectedOverlayId: Long?,
     onOverlayAdd: (String) -> Unit,
     onOverlayUpdate: (Long, Float, Float, Float, Float) -> Unit,
-    onPickImage: () -> Unit
+    onPickImage: () -> Unit,
+    onDelete: (Long) -> Unit = {}
 ) {
     val overlays = remember(clip?.imageOverlays) {
         parseImageOverlays(clip?.imageOverlays)
     }
+    val selectedOverlay = remember(overlays, selectedOverlayId) { overlays.firstOrNull { it.id == selectedOverlayId } }
 
     Column {
         Row(
@@ -1893,6 +1898,18 @@ private fun ImageOverlayTool(
                 style = MaterialTheme.typography.bodySmall,
                 color = TextDisabledDark
             )
+        }
+
+        if (selectedOverlay != null) {
+            Spacer(Modifier.height(12.dp))
+            TextButton(
+                onClick = { onDelete(selectedOverlay.id) },
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+            ) {
+                Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Delete Sticker", style = MaterialTheme.typography.labelMedium)
+            }
         }
 
         Spacer(Modifier.height(16.dp))
