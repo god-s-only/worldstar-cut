@@ -598,7 +598,9 @@ private fun VideoPreview(
                     color = overlay.color,
                     fontFamilyName = overlay.fontFamily,
                     animation = overlay.animation,
+                    animationOut = overlay.animationOut,
                     playbackMs = localMs,
+                    durationMs = overlay.durationMs,
                     isPlaying = isPlaying,
                     isSelected = selectedOverlayId == overlay.id,
                     onSelect = onOverlaySelected,
@@ -621,7 +623,9 @@ private fun VideoPreview(
                     rotation = overlay.rotation,
                     opacity = overlay.opacity,
                     animation = overlay.animation,
+                    animationOut = overlay.animationOut,
                     playbackMs = localMs,
+                    durationMs = overlay.durationMs,
                     isPlaying = isPlaying,
                     isSelected = selectedOverlayId == overlay.id,
                     onSelect = onOverlaySelected,
@@ -1945,7 +1949,9 @@ private fun DraggableText(
     color: Int = Color.White.hashCode(),
     fontFamilyName: String = "default",
     animation: String = "none",
+    animationOut: String = "none",
     playbackMs: Long = 0L,
+    durationMs: Long = 3000L,
     isPlaying: Boolean = false,
     isSelected: Boolean,
     onSelect: (Long) -> Unit,
@@ -1973,20 +1979,31 @@ private fun DraggableText(
         angle = rotation
     }
 
-    // CapCut-style animation (progress 0..1 from playbackMs)
+    // CapCut-style animation — entrance + exit
     val animDuration = 600L
+    val timeRemaining = durationMs - playbackMs
+    val isEntrance = isPlaying && playbackMs in 0..animDuration && animation != "none"
+    val isExit = isPlaying && timeRemaining in 0..animDuration && animationOut != "none" && playbackMs < durationMs
     val animProgress = when {
-        animation == "none" -> 1f
-        isPlaying && playbackMs in 0..animDuration -> playbackMs.toFloat() / animDuration
-        isPlaying && playbackMs > animDuration -> 1f
+        isEntrance -> playbackMs.toFloat() / animDuration
+        isExit -> timeRemaining.toFloat() / animDuration
         else -> 1f
     }
-    val displayedText = if (animation == "typewriter" && isPlaying && playbackMs in 0..animDuration) {
-        val len = (text.length * animProgress).toInt().coerceIn(0, text.length)
-        if (len <= 0) " " else text.take(len)
-    } else text
-    val glitchOffsetX = if (animation == "glitch" && animProgress < 1f) {
-        (kotlin.random.Random.nextFloat() - 0.5f) * 16f * (1f - animProgress)
+    val activeAnim = when {
+        isEntrance -> animation
+        isExit -> animationOut
+        else -> "none"
+    }
+    val activeProgress = if (isEntrance || isExit) animProgress else 1f
+    val displayedText = when {
+        activeAnim == "typewriter" && (isEntrance || isExit) -> {
+            val len = (text.length * activeProgress).toInt().coerceIn(0, text.length)
+            if (len <= 0) " " else text.take(len)
+        }
+        else -> text
+    }
+    val glitchOffsetX = if (activeAnim == "glitch" && activeProgress < 1f) {
+        (kotlin.random.Random.nextFloat() - 0.5f) * 16f * (1f - activeProgress)
     } else 0f
 
     Box(
@@ -2009,15 +2026,15 @@ private fun DraggableText(
                     var tx = 0f
                     var ty = 0f
                     var sFactor = 1f
-                    when (animation) {
-                        "fade" -> a = animProgress
-                        "slide_up" -> { ty = (1f - animProgress) * 80f; a = animProgress }
-                        "slide_down" -> { ty = -(1f - animProgress) * 80f; a = animProgress }
-                        "slide_left" -> { tx = (1f - animProgress) * 80f; a = animProgress }
-                        "slide_right" -> { tx = -(1f - animProgress) * 80f; a = animProgress }
-                        "scale" -> { sFactor = 0.3f + 0.7f * animProgress; a = animProgress }
-                        "glitch" -> { tx = glitchOffsetX; a = animProgress }
-                        "wave" -> { ty = kotlin.math.sin(animProgress * Math.PI * 4).toFloat() * 10f }
+                    when (activeAnim) {
+                        "fade" -> a = activeProgress
+                        "slide_up" -> { ty = (1f - activeProgress) * 80f; a = activeProgress }
+                        "slide_down" -> { ty = -(1f - activeProgress) * 80f; a = activeProgress }
+                        "slide_left" -> { tx = (1f - activeProgress) * 80f; a = activeProgress }
+                        "slide_right" -> { tx = -(1f - activeProgress) * 80f; a = activeProgress }
+                        "scale" -> { sFactor = 0.3f + 0.7f * activeProgress; a = activeProgress }
+                        "glitch" -> { tx = glitchOffsetX; a = activeProgress }
+                        "wave" -> { ty = kotlin.math.sin(activeProgress * Math.PI * 4).toFloat() * 10f }
                         else -> {}
                     }
                     alpha = a
@@ -2126,7 +2143,9 @@ private fun DraggableImage(
     rotation: Float,
     opacity: Float = 1f,
     animation: String = "none",
+    animationOut: String = "none",
     playbackMs: Long = 0L,
+    durationMs: Long = 3000L,
     isPlaying: Boolean = false,
     isSelected: Boolean,
     onSelect: (Long) -> Unit,
@@ -2144,16 +2163,24 @@ private fun DraggableImage(
         angle = rotation
     }
 
-    // CapCut animation for sticker (same set as text)
+    // CapCut animation — entrance + exit for sticker
     val animDuration = 600L
+    val timeRemaining = durationMs - playbackMs
+    val isEntrance = isPlaying && playbackMs in 0..animDuration && animation != "none"
+    val isExit = isPlaying && timeRemaining in 0..animDuration && animationOut != "none" && playbackMs < durationMs
     val animProgress = when {
-        animation == "none" -> 1f
-        isPlaying && playbackMs in 0..animDuration -> playbackMs.toFloat() / animDuration
-        isPlaying && playbackMs > animDuration -> 1f
+        isEntrance -> playbackMs.toFloat() / animDuration
+        isExit -> timeRemaining.toFloat() / animDuration
         else -> 1f
     }
-    val glitchOffsetX = if (animation == "glitch" && animProgress < 1f) {
-        (kotlin.random.Random.nextFloat() - 0.5f) * 16f * (1f - animProgress)
+    val activeAnim = when {
+        isEntrance -> animation
+        isExit -> animationOut
+        else -> "none"
+    }
+    val activeProgress = if (isEntrance || isExit) animProgress else 1f
+    val glitchOffsetX = if (activeAnim == "glitch" && activeProgress < 1f) {
+        (kotlin.random.Random.nextFloat() - 0.5f) * 16f * (1f - activeProgress)
     } else 0f
 
     Box(
@@ -2175,16 +2202,16 @@ private fun DraggableImage(
                     var tx = 0f
                     var ty = 0f
                     var sFactor = 1f
-                    when (animation) {
-                        "fade" -> a = opacity * animProgress
-                        "slide_up" -> { ty = (1f - animProgress) * 80f; a = opacity * animProgress }
-                        "slide_down" -> { ty = -(1f - animProgress) * 80f; a = opacity * animProgress }
-                        "slide_left" -> { tx = (1f - animProgress) * 80f; a = opacity * animProgress }
-                        "slide_right" -> { tx = -(1f - animProgress) * 80f; a = opacity * animProgress }
-                        "scale" -> { sFactor = 0.3f + 0.7f * animProgress; a = opacity * animProgress }
-                        "glitch" -> { tx = glitchOffsetX; a = opacity * animProgress }
-                        "wave" -> { ty = kotlin.math.sin(animProgress * Math.PI * 4).toFloat() * 10f }
-                        "typewriter" -> { a = if (animProgress < 1f) 0f else opacity }
+                    when (activeAnim) {
+                        "fade" -> a = opacity * activeProgress
+                        "slide_up" -> { ty = (1f - activeProgress) * 80f; a = opacity * activeProgress }
+                        "slide_down" -> { ty = -(1f - activeProgress) * 80f; a = opacity * activeProgress }
+                        "slide_left" -> { tx = (1f - activeProgress) * 80f; a = opacity * activeProgress }
+                        "slide_right" -> { tx = -(1f - activeProgress) * 80f; a = opacity * activeProgress }
+                        "scale" -> { sFactor = 0.3f + 0.7f * activeProgress; a = opacity * activeProgress }
+                        "glitch" -> { tx = glitchOffsetX; a = opacity * activeProgress }
+                        "wave" -> { ty = kotlin.math.sin(activeProgress * Math.PI * 4).toFloat() * 10f }
+                        "typewriter" -> { a = if (activeProgress < 1f) 0f else opacity }
                         else -> {}
                     }
                     alpha = a
