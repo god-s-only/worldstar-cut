@@ -57,8 +57,10 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.worldstar.cut.core.ui.theme.*
 import com.google.gson.Gson
+import com.worldstar.cut.features.video_editor.domain.model.AudioVolumeKeyframe
 import com.worldstar.cut.features.video_editor.domain.model.Clip
 import com.worldstar.cut.features.video_editor.domain.model.ImageOverlay
+import com.worldstar.cut.features.video_editor.domain.model.MotionSegment
 import com.worldstar.cut.features.video_editor.domain.model.MotionTrackPath
 import com.worldstar.cut.features.video_editor.domain.model.TextOverlay
 import com.worldstar.cut.features.video_editor.domain.model.TrackedFrame
@@ -2501,6 +2503,62 @@ fun serializeImageOverlays(overlays: List<ImageOverlay>): String {
             put("animation", o.animation)
             put("startMs", o.startMs)
             put("durationMs", o.durationMs)
+        })
+    }
+    return arr.toString()
+}
+
+internal fun parseVolumeKeyframes(json: String?): List<AudioVolumeKeyframe> {
+    if (json.isNullOrBlank()) return emptyList()
+    return try {
+        val arr = org.json.JSONArray(json)
+        (0 until arr.length()).map { i ->
+            val obj = arr.getJSONObject(i)
+            AudioVolumeKeyframe(
+                id = obj.optLong("id", 0L),
+                timeMs = obj.optLong("timeMs", 0L),
+                volume = obj.optDouble("volume", 1.0).toFloat()
+            )
+        }
+    } catch (_: Exception) { emptyList() }
+}
+
+fun serializeVolumeKeyframes(keyframes: List<AudioVolumeKeyframe>): String {
+    val arr = org.json.JSONArray()
+    keyframes.forEach { k ->
+        arr.put(org.json.JSONObject().apply {
+            put("id", k.id)
+            put("timeMs", k.timeMs)
+            put("volume", k.volume.toDouble())
+        })
+    }
+    return arr.toString()
+}
+
+internal fun parseMotionSegments(json: String?): List<MotionSegment> {
+    if (json.isNullOrBlank()) return emptyList()
+    return try {
+        val arr = org.json.JSONArray(json)
+        (0 until arr.length()).map { i ->
+            val obj = arr.getJSONObject(i)
+            MotionSegment(
+                id = obj.optLong("id", 0L),
+                effect = obj.optString("effect", "zoom_in"),
+                startMs = obj.optLong("startMs", 0L),
+                durationMs = obj.optLong("durationMs", 2000L)
+            )
+        }
+    } catch (_: Exception) { emptyList() }
+}
+
+fun serializeMotionSegments(segments: List<MotionSegment>): String {
+    val arr = org.json.JSONArray()
+    segments.forEach { s ->
+        arr.put(org.json.JSONObject().apply {
+            put("id", s.id)
+            put("effect", s.effect)
+            put("startMs", s.startMs)
+            put("durationMs", s.durationMs)
         })
     }
     return arr.toString()
