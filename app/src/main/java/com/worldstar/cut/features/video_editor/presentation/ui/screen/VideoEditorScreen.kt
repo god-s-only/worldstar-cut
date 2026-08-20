@@ -2878,6 +2878,7 @@ internal fun parseTextOverlays(json: String?): List<TextOverlay> {
                 color = obj.optInt("color", -1),
                 fontFamily = obj.optString("fontFamily", "default"),
                 animation = obj.optString("animation", "none"),
+                animationOut = obj.optString("animationOut", "none"),
                 startMs = obj.optLong("startMs", 0L),
                 durationMs = obj.optLong("durationMs", 3000L)
             )
@@ -2900,6 +2901,7 @@ fun serializeTextOverlays(overlays: List<TextOverlay>): String {
             put("color", o.color)
             put("fontFamily", o.fontFamily)
             put("animation", o.animation)
+            put("animationOut", o.animationOut)
             put("startMs", o.startMs)
             put("durationMs", o.durationMs)
         })
@@ -2922,6 +2924,7 @@ internal fun parseImageOverlays(json: String?): List<ImageOverlay> {
                 rotation = obj.optDouble("rotation", 0.0).toFloat(),
                 opacity = obj.optDouble("opacity", 1.0).toFloat(),
                 animation = obj.optString("animation", "none"),
+                animationOut = obj.optString("animationOut", "none"),
                 startMs = obj.optLong("startMs", 0L),
                 durationMs = obj.optLong("durationMs", 3000L)
             )
@@ -2943,6 +2946,7 @@ fun serializeImageOverlays(overlays: List<ImageOverlay>): String {
             put("rotation", o.rotation.toDouble())
             put("opacity", o.opacity.toDouble())
             put("animation", o.animation)
+            put("animationOut", o.animationOut)
             put("startMs", o.startMs)
             put("durationMs", o.durationMs)
         })
