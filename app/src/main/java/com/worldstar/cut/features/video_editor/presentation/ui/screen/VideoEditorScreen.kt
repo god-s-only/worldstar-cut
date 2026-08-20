@@ -990,6 +990,7 @@ private fun TextTool(
     overlaysJson: String?,
     onOverlayUpdate: (Long, String, Int, String) -> Unit,
     onAnimationChanged: (Long, String) -> Unit = { _, _ -> },
+    onExitAnimationChanged: (Long, String) -> Unit = { _, _ -> },
     onTimingChanged: (Long, Long, Long) -> Unit = { _, _, _ -> },
     onDeleteOverlay: (Long) -> Unit = {}
 ) {
@@ -1155,6 +1156,29 @@ private fun TextTool(
                         label = { Text(label, style = MaterialTheme.typography.labelMedium) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = WorldstarCyan,
+                            selectedLabelColor = Color.White,
+                            containerColor = SurfaceDark,
+                            labelColor = TextSecondaryDark
+                        )
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+            Text("Exit Animation", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
+            Spacer(Modifier.height(8.dp))
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp)
+            ) {
+                items(animationOptions) { (label, key) ->
+                    val isSelected = selectedOverlay?.animationOut == key
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { selectedOverlay?.let { onExitAnimationChanged(it.id, key) } },
+                        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = WorldstarPink,
                             selectedLabelColor = Color.White,
                             containerColor = SurfaceDark,
                             labelColor = TextSecondaryDark
