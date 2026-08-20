@@ -165,103 +165,138 @@ fun VideoEditorScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Video Preview with real PlayerView
-            VideoPreview(
-                player = viewModel.player,
-                uri = uiState.videoClips.firstOrNull()?.mediaUri,
-                isImage = uiState.videoClips.firstOrNull()?.isImage == true,
-                isPlaying = uiState.isPlaying,
-                progress = uiState.playbackProgress,
-                effectType = uiState.selectedClip?.effectType,
-                motionEffect = uiState.selectedClip?.motionEffect,
-                motionSegmentsJson = uiState.selectedClip?.motionSegments,
-                cropX = uiState.selectedClip?.cropX ?: 0f,
-                cropY = uiState.selectedClip?.cropY ?: 0f,
-                cropW = uiState.selectedClip?.cropW ?: 1f,
-                cropH = uiState.selectedClip?.cropH ?: 1f,
-                textOverlaysJson = uiState.selectedClip?.textOverlays,
-                motionTrackJson = uiState.selectedClip?.motionTrack,
-                playbackMs = uiState.playbackPositionMs,
-                imageOverlaysJson = uiState.selectedClip?.imageOverlays,
-                selectedOverlayId = uiState.selectedTextOverlayId,
-                onOverlaySelected = viewModel::onTextOverlaySelected,
-                onOverlayTransformChanged = viewModel::onTextOverlayTransformChanged,
-                onImageOverlayTransformChanged = viewModel::onImageOverlayTransformChanged,
-                onOverlayAdd = viewModel::onTextOverlayAdd,
-                isTransitioning = uiState.isTransitioning,
-                transitionProgress = uiState.transitionProgress,
-                nextClipUri = uiState.videoClips.getOrNull(uiState.currentPlayingClipIndex + 1)?.mediaUri,
-                onPlayPause = viewModel::onPlayPause,
+            // Preview — SaaS card, floating, rounded, elevated
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-            )
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.Black),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            ) {
+                VideoPreview(
+                    player = viewModel.player,
+                    uri = uiState.videoClips.firstOrNull()?.mediaUri,
+                    isImage = uiState.videoClips.firstOrNull()?.isImage == true,
+                    isPlaying = uiState.isPlaying,
+                    progress = uiState.playbackProgress,
+                    effectType = uiState.selectedClip?.effectType,
+                    motionEffect = uiState.selectedClip?.motionEffect,
+                    motionSegmentsJson = uiState.selectedClip?.motionSegments,
+                    cropX = uiState.selectedClip?.cropX ?: 0f,
+                    cropY = uiState.selectedClip?.cropY ?: 0f,
+                    cropW = uiState.selectedClip?.cropW ?: 1f,
+                    cropH = uiState.selectedClip?.cropH ?: 1f,
+                    textOverlaysJson = uiState.selectedClip?.textOverlays,
+                    motionTrackJson = uiState.selectedClip?.motionTrack,
+                    playbackMs = uiState.playbackPositionMs,
+                    imageOverlaysJson = uiState.selectedClip?.imageOverlays,
+                    selectedOverlayId = uiState.selectedTextOverlayId,
+                    onOverlaySelected = viewModel::onTextOverlaySelected,
+                    onOverlayTransformChanged = viewModel::onTextOverlayTransformChanged,
+                    onImageOverlayTransformChanged = viewModel::onImageOverlayTransformChanged,
+                    onOverlayAdd = viewModel::onTextOverlayAdd,
+                    isTransitioning = uiState.isTransitioning,
+                    transitionProgress = uiState.transitionProgress,
+                    nextClipUri = uiState.videoClips.getOrNull(uiState.currentPlayingClipIndex + 1)?.mediaUri,
+                    onPlayPause = viewModel::onPlayPause,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
 
-            // Tool Panel (slides up above toolbar when active)
+            // Tool Panel — SaaS bottom sheet, elevated
             AnimatedVisibility(
                 visible = uiState.activeTool != EditorTool.None,
                 enter = slideInVertically(initialOffsetY = { it / 2 }) + fadeIn(),
                 exit = slideOutVertically(targetOffsetY = { it / 2 }) + fadeOut()
             ) {
-                ToolPanel(
-                    activeTool = uiState.activeTool,
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp),
+                    shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
+                ) {
+                    ToolPanel(
+                        activeTool = uiState.activeTool,
+                        selectedClip = uiState.selectedClip,
+                        onTrimStartChanged = viewModel::onTrimStartChanged,
+                        onTrimEndChanged = viewModel::onTrimEndChanged,
+                        onVolumeChanged = viewModel::onClipVolumeChanged,
+                        onSpeedChanged = viewModel::onClipSpeedChanged,
+                        onEffectChanged = viewModel::onClipEffectChanged,
+                        onMotionEffectChanged = viewModel::onClipMotionEffectChanged,
+                        onTransitionChanged = viewModel::onClipTransitionChanged,
+                        onCropChanged = viewModel::onClipCropChanged,
+                        onOverlayAdd = viewModel::onTextOverlayAdd,
+                        selectedOverlayId = uiState.selectedTextOverlayId,
+                        onOverlayUpdate = viewModel::onTextOverlayUpdate,
+                        onAnimationChanged = viewModel::onTextOverlayAnimationChanged,
+                        onTimingChanged = viewModel::onTextOverlayTimingChanged,
+                        onDeleteOverlay = viewModel::onTextOverlayDelete,
+                        isTracking = uiState.isTracking,
+                        trackProgress = uiState.trackProgress,
+                        onStartTracking = viewModel::onStartMotionTracking,
+                        onCancelTracking = viewModel::onCancelMotionTracking,
+                        onImageOverlayAdd = viewModel::onImageOverlayAdd,
+                        onImageOverlayUpdate = viewModel::onImageOverlayTransformChanged,
+                        onImageOverlayDelete = viewModel::onImageOverlayDelete,
+                        onImageOverlayAnimationChanged = viewModel::onImageOverlayAnimationChanged,
+                        onImageOverlayTimingChanged = viewModel::onImageOverlayTimingChanged,
+                        onPickImage = { imageOverlayPickerLauncher.launch("image/*") },
+                        onDelete = viewModel::onDeleteClip
+                    )
+                }
+            }
+
+            // Timeline — SaaS card with lanes, professional spacing
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp),
+                shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            ) {
+                Timeline(
+                    clips = uiState.videoClips,
+                    selectedClipId = uiState.selectedClipId,
+                    playbackPositionMs = uiState.playbackPositionMs,
+                    totalDurationMs = uiState.totalDurationMs,
+                    zoomLevel = uiState.zoomLevel,
+                    onClipSelected = viewModel::onClipSelected,
+                    onSeek = viewModel::onSeekTo,
+                    onZoomChanged = viewModel::onZoomChanged,
+                    onAddMedia = viewModel::onAddMediaClicked,
                     selectedClip = uiState.selectedClip,
-                    onTrimStartChanged = viewModel::onTrimStartChanged,
-                    onTrimEndChanged = viewModel::onTrimEndChanged,
-                    onVolumeChanged = viewModel::onClipVolumeChanged,
-                    onSpeedChanged = viewModel::onClipSpeedChanged,
-                    onEffectChanged = viewModel::onClipEffectChanged,
-                    onMotionEffectChanged = viewModel::onClipMotionEffectChanged,
-                    onTransitionChanged = viewModel::onClipTransitionChanged,
-                    onCropChanged = viewModel::onClipCropChanged,
-                    onOverlayAdd = viewModel::onTextOverlayAdd,
-                    selectedOverlayId = uiState.selectedTextOverlayId,
-                    onOverlayUpdate = viewModel::onTextOverlayUpdate,
-                    onAnimationChanged = viewModel::onTextOverlayAnimationChanged,
-                    onTimingChanged = viewModel::onTextOverlayTimingChanged,
-                    onDeleteOverlay = viewModel::onTextOverlayDelete,
-                    isTracking = uiState.isTracking,
-                    trackProgress = uiState.trackProgress,
-                    onStartTracking = viewModel::onStartMotionTracking,
-                    onCancelTracking = viewModel::onCancelMotionTracking,
-                    onImageOverlayAdd = viewModel::onImageOverlayAdd,
-                    onImageOverlayUpdate = viewModel::onImageOverlayTransformChanged,
-                    onImageOverlayDelete = viewModel::onImageOverlayDelete,
-                    onImageOverlayAnimationChanged = viewModel::onImageOverlayAnimationChanged,
-                    onImageOverlayTimingChanged = viewModel::onImageOverlayTimingChanged,
-                    onPickImage = { imageOverlayPickerLauncher.launch("image/*") },
-                    onDelete = viewModel::onDeleteClip
+                    selectedTextOverlayId = uiState.selectedTextOverlayId,
+                    onTextOverlaySelected = viewModel::onTextOverlaySelected,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp)
                 )
             }
 
-            // Compact Timeline + text track
-            Timeline(
-                clips = uiState.videoClips,
-                selectedClipId = uiState.selectedClipId,
-                playbackPositionMs = uiState.playbackPositionMs,
-                totalDurationMs = uiState.totalDurationMs,
-                zoomLevel = uiState.zoomLevel,
-                onClipSelected = viewModel::onClipSelected,
-                onSeek = viewModel::onSeekTo,
-                onZoomChanged = viewModel::onZoomChanged,
-                onAddMedia = viewModel::onAddMediaClicked,
-                selectedClip = uiState.selectedClip,
-                selectedTextOverlayId = uiState.selectedTextOverlayId,
-                onTextOverlaySelected = viewModel::onTextOverlaySelected,
+            // Bottom Toolbar — SaaS pill dock, floating
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(136.dp)
-            )
-
-            // Bottom Toolbar (fixed at bottom)
-            EditorToolsBar(
-                activeTool = uiState.activeTool,
-                onToolSelected = viewModel::onToolSelected,
-                onAudioClick = {
-                    audioPickerLauncher.launch("audio/*")
-                },
-                hasSelection = uiState.selectedClipId != null
-            )
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceVariantDark),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+            ) {
+                EditorToolsBar(
+                    activeTool = uiState.activeTool,
+                    onToolSelected = viewModel::onToolSelected,
+                    onAudioClick = {
+                        audioPickerLauncher.launch("audio/*")
+                    },
+                    hasSelection = uiState.selectedClipId != null
+                )
+            }
         }
     }
 }
