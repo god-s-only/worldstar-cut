@@ -208,6 +208,7 @@ fun VideoEditorScreen(
                     onVolumeChanged = viewModel::onClipVolumeChanged,
                     onSpeedChanged = viewModel::onClipSpeedChanged,
                     onEffectChanged = viewModel::onClipEffectChanged,
+                    onMotionEffectChanged = viewModel::onClipMotionEffectChanged,
                     onTransitionChanged = viewModel::onClipTransitionChanged,
                     onCropChanged = viewModel::onClipCropChanged,
                     onOverlayAdd = viewModel::onTextOverlayAdd,
@@ -632,6 +633,7 @@ private fun EditorToolsBar(
         ToolItem(EditorTool.Trim, Icons.Filled.ContentCut, "Trim"),
         ToolItem(EditorTool.Text, Icons.Filled.TextFields, "Text"),
         ToolItem(EditorTool.Effects, Icons.Filled.AutoFixHigh, "Filter"),
+        ToolItem(EditorTool.MotionEffect, Icons.Filled.Animation, "Motion"),
         ToolItem(EditorTool.Transition, Icons.Filled.SyncAlt, "Trans"),
         ToolItem(EditorTool.Crop, Icons.Filled.Crop, "Crop"),
         ToolItem(EditorTool.MotionTrack, Icons.Filled.GpsFixed, "Track"),
@@ -660,7 +662,7 @@ private fun EditorToolsBar(
                     EditorTool.Trim, EditorTool.Text, EditorTool.Effects,
                     EditorTool.Speed, EditorTool.Volume, EditorTool.Adjust,
                     EditorTool.Transition, EditorTool.Crop, EditorTool.MotionTrack,
-                    EditorTool.ImageOverlay -> hasSelection
+                    EditorTool.ImageOverlay, EditorTool.MotionEffect -> hasSelection
                     else -> true
                 }
 
@@ -736,6 +738,7 @@ private fun ToolPanel(
     onVolumeChanged: (Float) -> Unit,
     onSpeedChanged: (Float) -> Unit,
     onEffectChanged: (String?) -> Unit,
+    onMotionEffectChanged: (String?) -> Unit,
     onTransitionChanged: (String?) -> Unit,
     onCropChanged: (Float, Float, Float, Float) -> Unit,
     onOverlayAdd: () -> Unit,
@@ -805,6 +808,10 @@ private fun ToolPanel(
                 EditorTool.Effects -> EffectsTool(
                     clip = selectedClip,
                     onEffectChanged = onEffectChanged
+                )
+                EditorTool.MotionEffect -> MotionEffectTool(
+                    clip = selectedClip,
+                    onMotionEffectChanged = onMotionEffectChanged
                 )
                 EditorTool.Transition -> TransitionTool(
                     clip = selectedClip,
@@ -1149,6 +1156,52 @@ private fun EffectsTool(
                     label = { Text(effect, style = MaterialTheme.typography.labelSmall) },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = WorldstarPurpleLight,
+                        selectedLabelColor = Color.White,
+                        containerColor = SurfaceDark,
+                        labelColor = TextSecondaryDark
+                    )
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MotionEffectTool(
+    clip: Clip?,
+    onMotionEffectChanged: (String?) -> Unit
+) {
+    val effects = listOf(
+        "None" to "none",
+        "Zoom In" to "zoom_in",
+        "Zoom Out" to "zoom_out",
+        "Pan Left" to "pan_left",
+        "Pan Right" to "pan_right",
+        "Pan Up" to "pan_up",
+        "Pan Down" to "pan_down",
+        "Rotate CW" to "rotate_cw",
+        "Rotate CCW" to "rotate_ccw",
+        "Shake" to "shake",
+        "Ken Burns" to "ken_burns",
+        "Tilt 3D" to "tilt_3d",
+        "Parallax" to "parallax"
+    )
+    val current = clip?.motionEffect ?: "none"
+
+    Column {
+        Text("Motion — Advanced", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
+        Spacer(Modifier.height(4.dp))
+        Text("Applies to entire clip over playback", style = MaterialTheme.typography.labelSmall, color = TextDisabledDark)
+        Spacer(Modifier.height(12.dp))
+
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(effects) { (label, key) ->
+                FilterChip(
+                    selected = current == key,
+                    onClick = { onMotionEffectChanged(if (key == "none") null else key) },
+                    label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = WorldstarCyan,
                         selectedLabelColor = Color.White,
                         containerColor = SurfaceDark,
                         labelColor = TextSecondaryDark
