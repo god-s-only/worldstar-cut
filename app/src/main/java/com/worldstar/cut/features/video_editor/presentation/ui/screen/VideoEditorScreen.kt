@@ -212,6 +212,7 @@ fun VideoEditorScreen(
                     onOverlayAdd = viewModel::onTextOverlayAdd,
                     selectedOverlayId = uiState.selectedTextOverlayId,
                     onOverlayUpdate = viewModel::onTextOverlayUpdate,
+                    onAnimationChanged = viewModel::onTextOverlayAnimationChanged,
                     isTracking = uiState.isTracking,
                     trackProgress = uiState.trackProgress,
                     onStartTracking = viewModel::onStartMotionTracking,
@@ -706,6 +707,7 @@ private fun ToolPanel(
     onOverlayAdd: () -> Unit,
     selectedOverlayId: Long?,
     onOverlayUpdate: (Long, String, Int, String) -> Unit,
+    onAnimationChanged: (Long, String) -> Unit,
     isTracking: Boolean,
     trackProgress: Float,
     onStartTracking: () -> Unit,
@@ -759,7 +761,8 @@ private fun ToolPanel(
                     onOverlayAdd = onOverlayAdd,
                     selectedOverlayId = selectedOverlayId,
                     overlaysJson = selectedClip?.textOverlays,
-                    onOverlayUpdate = onOverlayUpdate
+                    onOverlayUpdate = onOverlayUpdate,
+                    onAnimationChanged = onAnimationChanged
                 )
                 EditorTool.Effects -> EffectsTool(
                     clip = selectedClip,
@@ -855,7 +858,8 @@ private fun TextTool(
     onOverlayAdd: () -> Unit,
     selectedOverlayId: Long?,
     overlaysJson: String?,
-    onOverlayUpdate: (Long, String, Int, String) -> Unit
+    onOverlayUpdate: (Long, String, Int, String) -> Unit,
+    onAnimationChanged: (Long, String) -> Unit = { _, _ -> }
 ) {
     val overlays = remember(overlaysJson) { parseTextOverlays(overlaysJson) }
     val selectedOverlay = remember(overlays, selectedOverlayId) { overlays.firstOrNull { it.id == selectedOverlayId } }
@@ -984,6 +988,41 @@ private fun TextTool(
                         label = { Text(name, style = MaterialTheme.typography.labelMedium) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = WorldstarPurpleLight,
+                            selectedLabelColor = Color.White,
+                            containerColor = SurfaceDark,
+                            labelColor = TextSecondaryDark
+                        )
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
+            Text("Animation — CapCut", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
+            Spacer(Modifier.height(10.dp))
+            val animationOptions = listOf(
+                "None" to "none",
+                "Fade" to "fade",
+                "Slide Up" to "slide_up",
+                "Slide Down" to "slide_down",
+                "Slide Left" to "slide_left",
+                "Slide Right" to "slide_right",
+                "Scale" to "scale",
+                "Glitch" to "glitch",
+                "Wave" to "wave",
+                "Typewriter" to "typewriter"
+            )
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp)
+            ) {
+                items(animationOptions) { (label, key) ->
+                    val isSelected = selectedOverlay?.animation == key
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { selectedOverlay?.let { onAnimationChanged(it.id, key) } },
+                        label = { Text(label, style = MaterialTheme.typography.labelMedium) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = WorldstarCyan,
                             selectedLabelColor = Color.White,
                             containerColor = SurfaceDark,
                             labelColor = TextSecondaryDark

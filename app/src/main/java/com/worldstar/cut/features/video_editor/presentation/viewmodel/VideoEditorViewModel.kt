@@ -278,6 +278,19 @@ class VideoEditorViewModel @Inject constructor(
         }
     }
 
+    fun onTextOverlayAnimationChanged(overlayId: Long, animation: String) {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            val overlays = parseTextOverlays(clip.textOverlays).toMutableList()
+            val idx = overlays.indexOfFirst { it.id == overlayId }
+            if (idx >= 0) {
+                overlays[idx] = overlays[idx].copy(animation = animation)
+                val json = serializeTextOverlays(overlays)
+                updateClipUseCase(clip.copy(textOverlays = json))
+            }
+        }
+    }
+
     fun onDeleteClip() {
         val clip = _uiState.value.selectedClip ?: return
         viewModelScope.launch {
