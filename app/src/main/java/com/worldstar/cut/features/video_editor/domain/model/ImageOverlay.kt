@@ -9,6 +9,7 @@ data class ImageOverlay(
     val rotation: Float = 0f,
     val opacity: Float = 1f,
     val animation: String = "none",
+    val animationOut: String = "none",
     val startMs: Long = 0L,
     val durationMs: Long = 3000L
 )
