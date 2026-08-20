@@ -213,6 +213,8 @@ fun VideoEditorScreen(
                     selectedOverlayId = uiState.selectedTextOverlayId,
                     onOverlayUpdate = viewModel::onTextOverlayUpdate,
                     onAnimationChanged = viewModel::onTextOverlayAnimationChanged,
+                    onTimingChanged = viewModel::onTextOverlayTimingChanged,
+                    onDeleteOverlay = viewModel::onTextOverlayDelete,
                     isTracking = uiState.isTracking,
                     trackProgress = uiState.trackProgress,
                     onStartTracking = viewModel::onStartMotionTracking,
@@ -713,6 +715,8 @@ private fun ToolPanel(
     selectedOverlayId: Long?,
     onOverlayUpdate: (Long, String, Int, String) -> Unit,
     onAnimationChanged: (Long, String) -> Unit,
+    onTimingChanged: (Long, Long, Long) -> Unit,
+    onDeleteOverlay: (Long) -> Unit,
     isTracking: Boolean,
     trackProgress: Float,
     onStartTracking: () -> Unit,
@@ -767,7 +771,9 @@ private fun ToolPanel(
                     selectedOverlayId = selectedOverlayId,
                     overlaysJson = selectedClip?.textOverlays,
                     onOverlayUpdate = onOverlayUpdate,
-                    onAnimationChanged = onAnimationChanged
+                    onAnimationChanged = onAnimationChanged,
+                    onTimingChanged = onTimingChanged,
+                    onDeleteOverlay = onDeleteOverlay
                 )
                 EditorTool.Effects -> EffectsTool(
                     clip = selectedClip,
@@ -864,7 +870,9 @@ private fun TextTool(
     selectedOverlayId: Long?,
     overlaysJson: String?,
     onOverlayUpdate: (Long, String, Int, String) -> Unit,
-    onAnimationChanged: (Long, String) -> Unit = { _, _ -> }
+    onAnimationChanged: (Long, String) -> Unit = { _, _ -> },
+    onTimingChanged: (Long, Long, Long) -> Unit = { _, _, _ -> },
+    onDeleteOverlay: (Long) -> Unit = {}
 ) {
     val overlays = remember(overlaysJson) { parseTextOverlays(overlaysJson) }
     val selectedOverlay = remember(overlays, selectedOverlayId) { overlays.firstOrNull { it.id == selectedOverlayId } }
@@ -1035,6 +1043,52 @@ private fun TextTool(
                     )
                 }
             }
+
+            Spacer(Modifier.height(20.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Timing", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = { selectedOverlay?.let { onDeleteOverlay(it.id) } }) {
+                    Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Remove", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium)
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            val clipDuration = clip?.trimmedDurationMs?.takeIf { it > 0 } ?: clip?.durationMs?.takeIf { it > 0 } ?: 5000L
+            var startMsState by remember(selectedOverlay?.id) { mutableFloatStateOf(selectedOverlay?.startMs?.toFloat() ?: 0f) }
+            var durationMsState by remember(selectedOverlay?.id) { mutableFloatStateOf(selectedOverlay?.durationMs?.toFloat() ?: 3000f) }
+            LaunchedEffect(selectedOverlay?.id, selectedOverlay?.startMs, selectedOverlay?.durationMs) {
+                startMsState = selectedOverlay?.startMs?.toFloat() ?: 0f
+                durationMsState = selectedOverlay?.durationMs?.toFloat() ?: 3000f
+            }
+            Text("Start: ${formatTime(startMsState.toLong())}", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
+            Slider(
+                value = startMsState / 1000f,
+                onValueChange = { v ->
+                    startMsState = v * 1000f
+                    val maxStart = (clipDuration - durationMsState).coerceAtLeast(0f)
+                    val clampedStart = startMsState.coerceIn(0f, maxStart)
+                    selectedOverlay?.let { onTimingChanged(it.id, clampedStart.toLong(), durationMsState.toLong()) }
+                },
+                valueRange = 0f..(clipDuration.toFloat() / 1000f).coerceAtLeast(0.5f),
+                colors = SliderDefaults.colors(thumbColor = WorldstarCyan, activeTrackColor = WorldstarCyan)
+            )
+            Text("Duration: ${formatTime(durationMsState.toLong())}", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
+            Slider(
+                value = durationMsState / 1000f,
+                onValueChange = { v ->
+                    durationMsState = v * 1000f
+                    val maxDur = (clipDuration - startMsState).coerceAtLeast(200f)
+                    val clampedDur = durationMsState.coerceIn(200f, maxDur)
+                    selectedOverlay?.let { onTimingChanged(it.id, startMsState.toLong(), clampedDur.toLong()) }
+                },
+                valueRange = 0.2f..((clipDuration.toFloat() / 1000f).coerceAtLeast(0.5f)),
+                colors = SliderDefaults.colors(thumbColor = WorldstarPink, activeTrackColor = WorldstarPink)
+            )
         } else {
             Spacer(Modifier.height(24.dp))
             Text(
