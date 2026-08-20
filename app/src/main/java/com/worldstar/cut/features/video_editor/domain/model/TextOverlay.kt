@@ -10,6 +10,7 @@ data class TextOverlay(
     val color: Int = -1,
     val fontFamily: String = "default",
     val animation: String = "none",
+    val animationOut: String = "none",
     val startMs: Long = 0L,
     val durationMs: Long = 3000L
 )
