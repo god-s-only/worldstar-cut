@@ -247,7 +247,7 @@ fun VideoEditorScreen(
                 onTextOverlaySelected = viewModel::onTextOverlaySelected,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(110.dp)
+                    .height(136.dp)
             )
 
             // Bottom Toolbar (fixed at bottom)
@@ -2330,6 +2330,63 @@ private fun Timeline(
                                         color = Color.White,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                            if (totalDurationMs > 0) {
+                                val px = (playbackPositionMs.toFloat() / totalDurationMs) * (totalDurationMs / 1000f * 36f * zoomLevel)
+                                Box(
+                                    modifier = Modifier
+                                        .offset(x = px.dp)
+                                        .fillMaxHeight()
+                                        .width(1.dp)
+                                        .background(WorldstarPink.copy(alpha = 0.5f))
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Sticker overlay track
+        if (selectedClip != null) {
+            val imageOverlays = remember(selectedClip.imageOverlays) { parseImageOverlays(selectedClip.imageOverlays) }
+            if (imageOverlays.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(26.dp)
+                        .padding(horizontal = 8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                    ) {
+                        val totalWidth = (totalDurationMs.coerceAtLeast(1000L) / 1000f * 36f * zoomLevel).dp.coerceAtLeast(200.dp)
+                        Box(modifier = Modifier.width(totalWidth).height(26.dp)) {
+                            imageOverlays.forEach { overlay ->
+                                val isSelected = overlay.id == selectedTextOverlayId
+                                val offsetX = ((overlay.startMs / 1000f) * 36f * zoomLevel).dp
+                                val barWidth = ((overlay.durationMs / 1000f) * 36f * zoomLevel).dp.coerceAtLeast(24.dp)
+                                Box(
+                                    modifier = Modifier
+                                        .offset(x = offsetX)
+                                        .width(barWidth)
+                                        .height(18.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(if (isSelected) WorldstarCyan else Color(0xFFFF9800).copy(alpha = 0.7f))
+                                        .border(if (isSelected) 1.dp else 0.dp, Color.White, RoundedCornerShape(4.dp))
+                                        .clickable { onTextOverlaySelected(overlay.id) }
+                                        .padding(horizontal = 4.dp),
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+                                    Text(
+                                        text = "Sticker",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 7.sp),
+                                        color = Color.White,
+                                        maxLines = 1
                                     )
                                 }
                             }
