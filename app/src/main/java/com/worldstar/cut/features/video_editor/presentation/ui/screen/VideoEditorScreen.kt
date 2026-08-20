@@ -782,6 +782,7 @@ private fun ToolPanel(
                 EditorTool.None -> {}
             }
         }
+        }
     }
 }
 
