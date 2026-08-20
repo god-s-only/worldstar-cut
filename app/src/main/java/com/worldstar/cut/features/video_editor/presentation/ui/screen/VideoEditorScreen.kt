@@ -171,6 +171,7 @@ fun VideoEditorScreen(
                 isPlaying = uiState.isPlaying,
                 progress = uiState.playbackProgress,
                 effectType = uiState.selectedClip?.effectType,
+                motionEffect = uiState.selectedClip?.motionEffect,
                 cropX = uiState.selectedClip?.cropX ?: 0f,
                 cropY = uiState.selectedClip?.cropY ?: 0f,
                 cropW = uiState.selectedClip?.cropW ?: 1f,
@@ -313,7 +314,7 @@ private fun VideoPreview(
     isPlaying: Boolean,
     progress: Float,
     effectType: String? = null,
-    cropX: Float = 0f,
+    motionEffect: String? = null,
     cropY: Float = 0f,
     cropW: Float = 1f,
     cropH: Float = 1f,
@@ -357,6 +358,29 @@ private fun VideoPreview(
             } else {
                 Modifier.fillMaxSize()
             }
+            // Advanced motion effect (zoom/pan/rotate/shake/ken_burns/tilt/parallax)
+            val motionModifier = Modifier.graphicsLayer {
+                if (motionEffect == null || motionEffect == "none") return@graphicsLayer
+                val p = progress.coerceIn(0f, 1f)
+                when (motionEffect) {
+                    "zoom_in" -> { scaleX = 1f + 0.3f * p; scaleY = 1f + 0.3f * p }
+                    "zoom_out" -> { scaleX = 1.3f - 0.3f * p; scaleY = 1.3f - 0.3f * p }
+                    "pan_left" -> translationX = 60f * (0.5f - p)
+                    "pan_right" -> translationX = 60f * (p - 0.5f)
+                    "pan_up" -> translationY = 60f * (0.5f - p)
+                    "pan_down" -> translationY = 60f * (p - 0.5f)
+                    "rotate_cw" -> rotationZ = 10f * p
+                    "rotate_ccw" -> rotationZ = -10f * p
+                    "shake" -> {
+                        translationX = (kotlin.random.Random.nextFloat() - 0.5f) * 14f
+                        translationY = (kotlin.random.Random.nextFloat() - 0.5f) * 10f
+                    }
+                    "ken_burns" -> { scaleX = 1f + 0.25f * p; scaleY = 1f + 0.25f * p; translationX = 22f * p; translationY = 12f * p }
+                    "tilt_3d" -> { rotationX = kotlin.math.sin(p * Math.PI * 2).toFloat() * 8f; rotationY = kotlin.math.cos(p * Math.PI * 2).toFloat() * 8f; cameraDistance = 12f * density }
+                    "parallax" -> { translationX = kotlin.math.sin(p * Math.PI * 2).toFloat() * 28f; scaleX = 1f + 0.08f * kotlin.math.sin(p * Math.PI * 2).toFloat(); scaleY = 1f + 0.08f * kotlin.math.sin(p * Math.PI * 2).toFloat() }
+                }
+            }
+            val mediaModifier = cropModifier.then(motionModifier)
 
             if (isImage) {
                 // Static image preview using Coil
@@ -411,7 +435,7 @@ private fun VideoPreview(
                 coil.compose.AsyncImage(
                     model = uri,
                     contentDescription = "Image preview",
-                    modifier = cropModifier,
+                    modifier = mediaModifier,
                     contentScale = ContentScale.Fit,
                     colorFilter = colorFilter
                 )
@@ -428,7 +452,7 @@ private fun VideoPreview(
                     update = { playerView ->
                         playerView.player = player
                     },
-                    modifier = cropModifier
+                    modifier = mediaModifier
                 )
 
                 // Play/Pause overlay (fades in/out)
