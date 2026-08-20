@@ -376,6 +376,19 @@ class VideoEditorViewModel @Inject constructor(
         }
     }
 
+    fun onTextOverlayExitAnimationChanged(overlayId: Long, animationOut: String) {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            val overlays = parseTextOverlays(clip.textOverlays).toMutableList()
+            val idx = overlays.indexOfFirst { it.id == overlayId }
+            if (idx >= 0) {
+                overlays[idx] = overlays[idx].copy(animationOut = animationOut)
+                val json = serializeTextOverlays(overlays)
+                updateClipUseCase(clip.copy(textOverlays = json))
+            }
+        }
+    }
+
     fun onTextOverlayTimingChanged(overlayId: Long, startMs: Long, durationMs: Long) {
         val clip = _uiState.value.selectedClip ?: return
         viewModelScope.launch {
@@ -542,6 +555,19 @@ class VideoEditorViewModel @Inject constructor(
             val idx = overlays.indexOfFirst { it.id == overlayId }
             if (idx >= 0) {
                 overlays[idx] = overlays[idx].copy(animation = animation)
+                val json = serializeImageOverlays(overlays)
+                updateClipUseCase(clip.copy(imageOverlays = json))
+            }
+        }
+    }
+
+    fun onImageOverlayExitAnimationChanged(overlayId: Long, animationOut: String) {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            val overlays = parseImageOverlays(clip.imageOverlays).toMutableList()
+            val idx = overlays.indexOfFirst { it.id == overlayId }
+            if (idx >= 0) {
+                overlays[idx] = overlays[idx].copy(animationOut = animationOut)
                 val json = serializeImageOverlays(overlays)
                 updateClipUseCase(clip.copy(imageOverlays = json))
             }
