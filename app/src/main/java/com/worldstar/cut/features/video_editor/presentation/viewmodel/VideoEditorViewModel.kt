@@ -644,6 +644,17 @@ class VideoEditorViewModel @Inject constructor(
                 val currentClip = videoClips.getOrNull(clipIndex)
                 val nextClip = videoClips.getOrNull(clipIndex + 1)
 
+                // Volume ducking interpolation
+                currentClip?.let { clip ->
+                    val kfs = parseVolumeKeyframes(clip.volumeKeyframes)
+                    if (kfs.isNotEmpty()) {
+                        val targetVol = interpolateVolume(kfs, pos)
+                        if (kotlin.math.abs(targetVol - player.volume) > 0.01f) {
+                            player.volume = targetVol
+                        }
+                    }
+                }
+
                 // Calculate transition state
                 val transitionMs = currentClip?.transitionDurationMs ?: 500L
                 val hasTransition = currentClip?.hasTransition == true && nextClip != null
@@ -665,6 +676,18 @@ class VideoEditorViewModel @Inject constructor(
                 delay(50)
             }
         }
+    }
+
+    private fun interpolateVolume(keyframes: List<AudioVolumeKeyframe>, posMs: Long): Float {
+        if (keyframes.isEmpty()) return 1f
+        val sorted = keyframes.sortedBy { it.timeMs }
+        if (posMs <= sorted.first().timeMs) return sorted.first().volume
+        if (posMs >= sorted.last().timeMs) return sorted.last().volume
+        val nextIdx = sorted.indexOfFirst { it.timeMs > posMs }
+        val prev = sorted[nextIdx - 1]
+        val next = sorted[nextIdx]
+        val t = (posMs - prev.timeMs).toFloat() / (next.timeMs - prev.timeMs).coerceAtLeast(1)
+        return prev.volume + (next.volume - prev.volume) * t
     }
 
     private fun stopPositionPolling() {
