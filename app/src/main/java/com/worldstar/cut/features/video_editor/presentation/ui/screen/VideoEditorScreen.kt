@@ -56,6 +56,7 @@ import androidx.media3.ui.PlayerView
 import com.worldstar.cut.core.ui.theme.*
 import com.google.gson.Gson
 import com.worldstar.cut.features.video_editor.domain.model.Clip
+import com.worldstar.cut.features.video_editor.domain.model.ImageOverlay
 import com.worldstar.cut.features.video_editor.domain.model.MotionTrackPath
 import com.worldstar.cut.features.video_editor.domain.model.TextOverlay
 import com.worldstar.cut.features.video_editor.domain.model.TrackedFrame
@@ -89,6 +90,12 @@ fun VideoEditorScreen(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let { viewModel.onAudioAdded(it.toString()) }
+    }
+
+    val imageOverlayPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { viewModel.onImageOverlayAdd(it.toString()) }
     }
 
     // Observe added media from media picker
@@ -169,9 +176,11 @@ fun VideoEditorScreen(
                 textOverlaysJson = uiState.selectedClip?.textOverlays,
                 motionTrackJson = uiState.selectedClip?.motionTrack,
                 playbackMs = uiState.playbackPositionMs,
+                imageOverlaysJson = uiState.selectedClip?.imageOverlays,
                 selectedOverlayId = uiState.selectedTextOverlayId,
                 onOverlaySelected = viewModel::onTextOverlaySelected,
                 onOverlayTransformChanged = viewModel::onTextOverlayTransformChanged,
+                onImageOverlayTransformChanged = viewModel::onImageOverlayTransformChanged,
                 onOverlayAdd = viewModel::onTextOverlayAdd,
                 isTransitioning = uiState.isTransitioning,
                 transitionProgress = uiState.transitionProgress,
@@ -215,6 +224,9 @@ fun VideoEditorScreen(
                     trackProgress = uiState.trackProgress,
                     onStartTracking = viewModel::onStartMotionTracking,
                     onCancelTracking = viewModel::onCancelMotionTracking,
+                    onImageOverlayAdd = viewModel::onImageOverlayAdd,
+                    onImageOverlayUpdate = viewModel::onImageOverlayTransformChanged,
+                    onPickImage = { imageOverlayPickerLauncher.launch("image/*") },
                     onDelete = viewModel::onDeleteClip
                 )
             }
@@ -291,9 +303,11 @@ private fun VideoPreview(
     textOverlaysJson: String? = null,
     motionTrackJson: String? = null,
     playbackMs: Long = 0L,
+    imageOverlaysJson: String? = null,
     selectedOverlayId: Long? = null,
     onOverlaySelected: (Long?) -> Unit = {},
     onOverlayTransformChanged: (Long, Float, Float, Float, Float) -> Unit = { _, _, _, _, _ -> },
+    onImageOverlayTransformChanged: (Long, Float, Float, Float, Float) -> Unit = { _, _, _, _, _ -> },
     onOverlayAdd: () -> Unit = {},
     isTransitioning: Boolean = false,
     transitionProgress: Float = 0f,
@@ -477,6 +491,23 @@ private fun VideoPreview(
                 )
             }
 
+            // Image overlays
+            val imgOverlays = remember(imageOverlaysJson) { parseImageOverlays(imageOverlaysJson) }
+            imgOverlays.forEach { overlay ->
+                DraggableImage(
+                    overlayId = overlay.id,
+                    imageUri = overlay.imageUri,
+                    posX = overlay.posX,
+                    posY = overlay.posY,
+                    sizeScale = overlay.sizeScale,
+                    rotation = overlay.rotation,
+                    opacity = overlay.opacity,
+                    isSelected = selectedOverlayId == overlay.id,
+                    onSelect = onOverlaySelected,
+                    onTransformChanged = onImageOverlayTransformChanged
+                )
+            }
+
             // Cross-fade transition overlay
             if (isTransitioning && nextClipUri != null) {
                 coil.compose.AsyncImage(
@@ -542,6 +573,7 @@ private fun EditorToolsBar(
         EditorTool.Transition to Icons.Filled.SyncAlt,
         EditorTool.Crop to Icons.Filled.Crop,
         EditorTool.MotionTrack to Icons.Filled.GpsFixed,
+        EditorTool.ImageOverlay to Icons.Filled.PhotoLibrary,
         EditorTool.Speed to Icons.Filled.Speed,
         EditorTool.Volume to Icons.Filled.VolumeUp,
         EditorTool.Adjust to Icons.Filled.Tune
@@ -560,7 +592,8 @@ private fun EditorToolsBar(
             val enabled = when (tool) {
                 EditorTool.Trim, EditorTool.Text, EditorTool.Effects,
                 EditorTool.Speed, EditorTool.Volume, EditorTool.Adjust,
-                EditorTool.Transition, EditorTool.Crop, EditorTool.MotionTrack -> hasSelection
+                EditorTool.Transition, EditorTool.Crop, EditorTool.MotionTrack,
+                EditorTool.ImageOverlay -> hasSelection
                 else -> true
             }
 
@@ -625,6 +658,9 @@ private fun ToolPanel(
     trackProgress: Float,
     onStartTracking: () -> Unit,
     onCancelTracking: () -> Unit,
+    onImageOverlayAdd: (String) -> Unit,
+    onImageOverlayUpdate: (Long, Float, Float, Float, Float) -> Unit,
+    onPickImage: () -> Unit,
     onDelete: () -> Unit
 ) {
     Surface(
@@ -663,6 +699,13 @@ private fun ToolPanel(
                     trackProgress = trackProgress,
                     onStartTracking = onStartTracking,
                     onCancelTracking = onCancelTracking
+                )
+                EditorTool.ImageOverlay -> ImageOverlayTool(
+                    clip = selectedClip,
+                    selectedOverlayId = selectedOverlayId,
+                    onOverlayAdd = onImageOverlayAdd,
+                    onOverlayUpdate = onImageOverlayUpdate,
+                    onPickImage = onPickImage
                 )
                 EditorTool.Speed -> SpeedTool(
                     clip = selectedClip,
@@ -1371,6 +1414,203 @@ private fun DraggableText(
     }
 }
 
+// ─── Draggable Image Overlay ─────────────────────────────────────────────────
+
+@Composable
+private fun DraggableImage(
+    overlayId: Long,
+    imageUri: String,
+    posX: Float,
+    posY: Float,
+    sizeScale: Float,
+    rotation: Float,
+    opacity: Float = 1f,
+    isSelected: Boolean,
+    onSelect: (Long) -> Unit,
+    onTransformChanged: (Long, Float, Float, Float, Float) -> Unit
+) {
+    var offset by remember { mutableStateOf(Offset(posX, posY)) }
+    var scale by remember { mutableFloatStateOf(sizeScale) }
+    var angle by remember { mutableFloatStateOf(rotation) }
+    var containerSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize(1, 1)) }
+    var imgSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize(0, 0)) }
+
+    LaunchedEffect(posX, posY, sizeScale, rotation) {
+        offset = Offset(posX, posY)
+        scale = sizeScale
+        angle = rotation
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .onSizeChanged { containerSize = it },
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .offset {
+                    IntOffset(
+                        x = ((offset.x - 0.5f) * containerSize.width).roundToInt(),
+                        y = ((offset.y - 0.5f) * containerSize.height).roundToInt()
+                    )
+                }
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    rotationZ = angle
+                    alpha = opacity
+                }
+                .pointerInput(overlayId) {
+                    detectTransformGestures { _, pan, zoom, rotation ->
+                        onSelect(overlayId)
+                        val newX = (offset.x + pan.x / containerSize.width).coerceIn(0f, 1f)
+                        val newY = (offset.y + pan.y / containerSize.height).coerceIn(0f, 1f)
+                        offset = Offset(newX, newY)
+                        scale = (scale * zoom).coerceIn(0.05f, 3f)
+                        angle = (angle + rotation) % 360f
+                        onTransformChanged(overlayId, newX, newY, scale, angle)
+                    }
+                }
+                .onSizeChanged { imgSize = it }
+                .then(
+                    if (isSelected) Modifier.border(2.dp, WorldstarCyan, RoundedCornerShape(4.dp))
+                    else Modifier
+                )
+        ) {
+            coil.compose.AsyncImage(
+                model = imageUri,
+                contentDescription = null,
+                modifier = Modifier.fillMaxWidth(),
+                contentScale = ContentScale.Fit
+            )
+        }
+
+        if (isSelected) {
+            val handleVisualSize = 10.dp
+            val handleTouchSize = 40.dp
+            val halfW = imgSize.width / 2
+            val halfH = imgSize.height / 2
+            val corners = listOf(
+                Alignment.TopStart to Offset(-1f, -1f),
+                Alignment.TopEnd to Offset(1f, -1f),
+                Alignment.BottomStart to Offset(-1f, 1f),
+                Alignment.BottomEnd to Offset(1f, 1f)
+            )
+            corners.forEach { (alignment, direction) ->
+                Box(
+                    modifier = Modifier
+                        .offset {
+                            IntOffset(
+                                x = ((offset.x - 0.5f) * containerSize.width).roundToInt() +
+                                        (direction.x * halfW).roundToInt(),
+                                y = ((offset.y - 0.5f) * containerSize.height).roundToInt() +
+                                        (direction.y * halfH).roundToInt()
+                            )
+                        }
+                        .size(handleTouchSize)
+                        .pointerInput(overlayId, direction) {
+                            detectTransformGestures { _, pan, _, _ ->
+                                onSelect(overlayId)
+                                val scaleXDelta = pan.x / (containerSize.width * 0.5f)
+                                val scaleYDelta = pan.y / (containerSize.height * 0.5f)
+                                val avgDelta = (scaleXDelta * direction.x + scaleYDelta * direction.y) / 2f
+                                scale = (scale + avgDelta).coerceIn(0.05f, 3f)
+                                onTransformChanged(overlayId, offset.x, offset.y, scale, angle)
+                            }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(handleVisualSize)
+                            .background(Color.White, CircleShape)
+                            .border(2.dp, WorldstarCyan, CircleShape)
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ─── Image Overlay Tool ──────────────────────────────────────────────────────
+
+@Composable
+private fun ImageOverlayTool(
+    clip: Clip?,
+    selectedOverlayId: Long?,
+    onOverlayAdd: (String) -> Unit,
+    onOverlayUpdate: (Long, Float, Float, Float, Float) -> Unit,
+    onPickImage: () -> Unit
+) {
+    val overlays = remember(clip?.imageOverlays) {
+        parseImageOverlays(clip?.imageOverlays)
+    }
+
+    Column(
+        modifier = Modifier.verticalScroll(rememberScrollState())
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Image Overlays", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
+            Spacer(Modifier.weight(1f))
+        }
+
+        if (overlays.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(overlays) { overlay ->
+                    val isSelected = selectedOverlayId == overlay.id
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(SurfaceDark)
+                            .then(
+                                if (isSelected) Modifier.border(2.dp, WorldstarCyan, RoundedCornerShape(8.dp))
+                                else Modifier
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        coil.compose.AsyncImage(
+                            model = overlay.imageUri,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(4.dp)
+                                .clip(RoundedCornerShape(4.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                }
+            }
+        } else {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "No image overlays yet.\nPick an image from your gallery to add it on top of the video.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextDisabledDark
+            )
+        }
+
+        Spacer(Modifier.height(16.dp))
+        Button(
+            onClick = onPickImage,
+            colors = ButtonDefaults.buttonColors(containerColor = WorldstarCyan),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(Icons.Default.PhotoLibrary, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Pick Image", fontWeight = FontWeight.SemiBold, color = Color.White)
+        }
+    }
+}
+
 // ─── Timeline ────────────────────────────────────────────────────────────────
 
 @Composable
@@ -1586,6 +1826,43 @@ fun serializeTextOverlays(overlays: List<TextOverlay>): String {
             put("rotation", o.rotation.toDouble())
             put("color", o.color)
             put("fontFamily", o.fontFamily)
+        })
+    }
+    return arr.toString()
+}
+
+internal fun parseImageOverlays(json: String?): List<ImageOverlay> {
+    if (json.isNullOrBlank()) return emptyList()
+    return try {
+        val arr = org.json.JSONArray(json)
+        (0 until arr.length()).map { i ->
+            val obj = arr.getJSONObject(i)
+            ImageOverlay(
+                id = obj.optLong("id", 0L),
+                imageUri = obj.optString("imageUri", ""),
+                posX = obj.optDouble("posX", 0.5).toFloat(),
+                posY = obj.optDouble("posY", 0.5).toFloat(),
+                sizeScale = obj.optDouble("sizeScale", 0.3).toFloat(),
+                rotation = obj.optDouble("rotation", 0.0).toFloat(),
+                opacity = obj.optDouble("opacity", 1.0).toFloat()
+            )
+        }
+    } catch (_: Exception) {
+        emptyList()
+    }
+}
+
+fun serializeImageOverlays(overlays: List<ImageOverlay>): String {
+    val arr = org.json.JSONArray()
+    overlays.forEach { o ->
+        arr.put(org.json.JSONObject().apply {
+            put("id", o.id)
+            put("imageUri", o.imageUri)
+            put("posX", o.posX.toDouble())
+            put("posY", o.posY.toDouble())
+            put("sizeScale", o.sizeScale.toDouble())
+            put("rotation", o.rotation.toDouble())
+            put("opacity", o.opacity.toDouble())
         })
     }
     return arr.toString()

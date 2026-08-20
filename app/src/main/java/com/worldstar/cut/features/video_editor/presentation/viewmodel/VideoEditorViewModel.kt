@@ -8,11 +8,14 @@ import androidx.lifecycle.viewModelScope
 import com.worldstar.cut.core.domain.result.Result
 import com.google.gson.Gson
 import com.worldstar.cut.features.video_editor.domain.model.Clip
+import com.worldstar.cut.features.video_editor.domain.model.ImageOverlay
 import com.worldstar.cut.features.video_editor.domain.model.Track
 import com.worldstar.cut.features.video_editor.domain.tracking.MotionTracker
 import com.worldstar.cut.features.video_editor.domain.usecase.*
 import com.worldstar.cut.features.video_editor.presentation.ui.screen.parseTextOverlays
 import com.worldstar.cut.features.video_editor.presentation.ui.screen.serializeTextOverlays
+import com.worldstar.cut.features.video_editor.presentation.ui.screen.parseImageOverlays
+import com.worldstar.cut.features.video_editor.presentation.ui.screen.serializeImageOverlays
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -331,6 +334,37 @@ class VideoEditorViewModel @Inject constructor(
         trackingJob?.cancel()
         trackingJob = null
         _uiState.update { it.copy(isTracking = false, trackProgress = 0f) }
+    }
+
+    fun onImageOverlayAdd(imageUri: String) {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            val existing = parseImageOverlays(clip.imageOverlays).toMutableList()
+            val newOverlay = ImageOverlay(
+                id = System.nanoTime(),
+                imageUri = imageUri,
+                posX = 0.5f,
+                posY = 0.5f,
+                sizeScale = 0.3f
+            )
+            existing.add(newOverlay)
+            val json = serializeImageOverlays(existing)
+            updateClipUseCase(clip.copy(imageOverlays = json))
+            _uiState.update { it.copy(selectedTextOverlayId = newOverlay.id) }
+        }
+    }
+
+    fun onImageOverlayTransformChanged(overlayId: Long, posX: Float, posY: Float, sizeScale: Float, rotation: Float) {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            val overlays = parseImageOverlays(clip.imageOverlays).toMutableList()
+            val idx = overlays.indexOfFirst { it.id == overlayId }
+            if (idx >= 0) {
+                overlays[idx] = overlays[idx].copy(posX = posX, posY = posY, sizeScale = sizeScale, rotation = rotation)
+                val json = serializeImageOverlays(overlays)
+                updateClipUseCase(clip.copy(imageOverlays = json))
+            }
+        }
     }
 
     fun onAddMediaClicked() {
