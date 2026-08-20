@@ -2413,6 +2413,114 @@ private fun Timeline(
                 }
             }
         }
+
+        // Audio ducking lane (volume keyframes)
+        if (selectedClip != null) {
+            val volumeKfs = remember(selectedClip.volumeKeyframes) { parseVolumeKeyframes(selectedClip.volumeKeyframes) }
+            if (volumeKfs.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(24.dp)
+                        .padding(horizontal = 8.dp)
+                        .background(Color(0xFF1B5E20).copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 4.dp, vertical = 4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                    ) {
+                        val totalWidth = (totalDurationMs.coerceAtLeast(1000L) / 1000f * 36f * zoomLevel).dp.coerceAtLeast(200.dp)
+                        Box(modifier = Modifier.width(totalWidth).height(16.dp)) {
+                            volumeKfs.forEach { kf ->
+                                val offsetX = ((kf.timeMs / 1000f) * 36f * zoomLevel).dp
+                                Box(
+                                    modifier = Modifier
+                                        .offset(x = offsetX)
+                                        .size(10.dp)
+                                        .clip(CircleShape)
+                                        .background(WorldstarCyan)
+                                        .border(1.dp, Color.White, CircleShape)
+                                )
+                            }
+                            if (totalDurationMs > 0) {
+                                val px = (playbackPositionMs.toFloat() / totalDurationMs) * (totalDurationMs / 1000f * 36f * zoomLevel)
+                                Box(
+                                    modifier = Modifier
+                                        .offset(x = px.dp)
+                                        .fillMaxHeight()
+                                        .width(1.dp)
+                                        .background(WorldstarCyan.copy(alpha = 0.6f))
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Motion segments lane (multi)
+        if (selectedClip != null) {
+            val motionSegs = remember(selectedClip.motionSegments, selectedClip.motionEffect) {
+                val segs = parseMotionSegments(selectedClip.motionSegments).toMutableList()
+                if (segs.isEmpty() && selectedClip.motionEffect != null && selectedClip.motionEffect != "none") {
+                    segs.add(MotionSegment(id = -1, effect = selectedClip.motionEffect!!, startMs = 0L, durationMs = totalDurationMs.coerceAtLeast(1000L)))
+                }
+                segs
+            }
+            if (motionSegs.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(26.dp)
+                        .padding(horizontal = 8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                    ) {
+                        val totalWidth = (totalDurationMs.coerceAtLeast(1000L) / 1000f * 36f * zoomLevel).dp.coerceAtLeast(200.dp)
+                        Box(modifier = Modifier.width(totalWidth).height(26.dp)) {
+                            motionSegs.forEach { seg ->
+                                val offsetX = ((seg.startMs / 1000f) * 36f * zoomLevel).dp
+                                val barWidth = ((seg.durationMs / 1000f) * 36f * zoomLevel).dp.coerceAtLeast(28.dp)
+                                Box(
+                                    modifier = Modifier
+                                        .offset(x = offsetX)
+                                        .width(barWidth)
+                                        .height(18.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(Color(0xFF6A1B9A).copy(alpha = 0.7f))
+                                        .border(1.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 4.dp),
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+                                    Text(
+                                        text = seg.effect.replace("_", " "),
+                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 7.sp),
+                                        color = Color.White,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                            if (totalDurationMs > 0) {
+                                val px = (playbackPositionMs.toFloat() / totalDurationMs) * (totalDurationMs / 1000f * 36f * zoomLevel)
+                                Box(
+                                    modifier = Modifier
+                                        .offset(x = px.dp)
+                                        .fillMaxHeight()
+                                        .width(1.dp)
+                                        .background(WorldstarPink.copy(alpha = 0.5f))
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
