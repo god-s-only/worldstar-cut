@@ -188,24 +188,14 @@ fun VideoEditorScreen(
                 onPlayPause = viewModel::onPlayPause,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
+                    .weight(1f)
             )
 
-            // Editor Tools Bar
-            EditorToolsBar(
-                activeTool = uiState.activeTool,
-                onToolSelected = viewModel::onToolSelected,
-                onAudioClick = {
-                    audioPickerLauncher.launch("audio/*")
-                },
-                hasSelection = uiState.selectedClipId != null
-            )
-
-            // Tool Panel (context-sensitive)
+            // Tool Panel (slides up above toolbar when active)
             AnimatedVisibility(
                 visible = uiState.activeTool != EditorTool.None,
-                enter = fadeIn() + slideInVertically(),
-                exit = fadeOut() + slideOutVertically()
+                enter = slideInVertically(initialOffsetY = { it / 2 }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it / 2 }) + fadeOut()
             ) {
                 ToolPanel(
                     activeTool = uiState.activeTool,
@@ -231,10 +221,7 @@ fun VideoEditorScreen(
                 )
             }
 
-            // Spacer pushes timeline to bottom
-            Spacer(Modifier.weight(1f))
-
-            // Timeline
+            // Compact Timeline
             Timeline(
                 clips = uiState.videoClips,
                 selectedClipId = uiState.selectedClipId,
@@ -247,7 +234,17 @@ fun VideoEditorScreen(
                 onAddMedia = viewModel::onAddMediaClicked,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(160.dp)
+                    .height(80.dp)
+            )
+
+            // Bottom Toolbar (fixed at bottom)
+            EditorToolsBar(
+                activeTool = uiState.activeTool,
+                onToolSelected = viewModel::onToolSelected,
+                onAudioClick = {
+                    audioPickerLauncher.launch("audio/*")
+                },
+                hasSelection = uiState.selectedClipId != null
             )
         }
     }
@@ -266,7 +263,7 @@ private fun EditorTopBar(
         title = {
             Text(
                 text = projectName,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleSmall,
                 color = TextPrimaryDark,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -274,12 +271,24 @@ private fun EditorTopBar(
         },
         navigationIcon = {
             IconButton(onClick = onBackClick) {
-                Icon(Icons.Default.ArrowBack, "Back", tint = TextPrimaryDark)
+                Icon(Icons.Default.ArrowBack, "Back", tint = TextPrimaryDark, modifier = Modifier.size(20.dp))
             }
         },
         actions = {
-            IconButton(onClick = onExportClick) {
-                Icon(Icons.Default.FileUpload, "Export", tint = WorldstarCyan)
+            Surface(
+                onClick = onExportClick,
+                color = WorldstarCyan,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.padding(end = 8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(Icons.Default.FileUpload, "Export", tint = Color.White, modifier = Modifier.size(14.dp))
+                    Text("Export", color = Color.White, style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold))
+                }
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark)
@@ -557,7 +566,7 @@ private fun VideoPreview(
     }
 }
 
-// ─── Editor Tools Bar ────────────────────────────────────────────────────────
+// ─── Editor Tools Bar (Bottom, InShot-style) ────────────────────────────────
 
 @Composable
 private fun EditorToolsBar(
@@ -566,74 +575,102 @@ private fun EditorToolsBar(
     onAudioClick: () -> Unit,
     hasSelection: Boolean
 ) {
+    data class ToolItem(val tool: EditorTool, val icon: ImageVector, val label: String)
+
     val tools = listOf(
-        EditorTool.Trim to Icons.Filled.ContentCut,
-        EditorTool.Text to Icons.Filled.TextFields,
-        EditorTool.Effects to Icons.Filled.AutoFixHigh,
-        EditorTool.Transition to Icons.Filled.SyncAlt,
-        EditorTool.Crop to Icons.Filled.Crop,
-        EditorTool.MotionTrack to Icons.Filled.GpsFixed,
-        EditorTool.ImageOverlay to Icons.Filled.PhotoLibrary,
-        EditorTool.Speed to Icons.Filled.Speed,
-        EditorTool.Volume to Icons.Filled.VolumeUp,
-        EditorTool.Adjust to Icons.Filled.Tune
+        ToolItem(EditorTool.Trim, Icons.Filled.ContentCut, "Trim"),
+        ToolItem(EditorTool.Text, Icons.Filled.TextFields, "Text"),
+        ToolItem(EditorTool.Effects, Icons.Filled.AutoFixHigh, "Filter"),
+        ToolItem(EditorTool.Transition, Icons.Filled.SyncAlt, "Trans"),
+        ToolItem(EditorTool.Crop, Icons.Filled.Crop, "Crop"),
+        ToolItem(EditorTool.MotionTrack, Icons.Filled.GpsFixed, "Track"),
+        ToolItem(EditorTool.ImageOverlay, Icons.Filled.PhotoLibrary, "Sticker"),
+        ToolItem(EditorTool.Speed, Icons.Filled.Speed, "Speed"),
+        ToolItem(EditorTool.Volume, Icons.Filled.VolumeUp, "Vol"),
+        ToolItem(EditorTool.Adjust, Icons.Filled.Tune, "Adjust")
     )
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(SurfaceDark)
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = SurfaceDark,
+        tonalElevation = 4.dp,
+        shadowElevation = 8.dp
     ) {
-        tools.forEach { (tool, icon) ->
-            val isActive = activeTool == tool
-            val enabled = when (tool) {
-                EditorTool.Trim, EditorTool.Text, EditorTool.Effects,
-                EditorTool.Speed, EditorTool.Volume, EditorTool.Adjust,
-                EditorTool.Transition, EditorTool.Crop, EditorTool.MotionTrack,
-                EditorTool.ImageOverlay -> hasSelection
-                else -> true
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 8.dp, vertical = 6.dp)
+                .navigationBarsPadding(),
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            tools.forEach { item ->
+                val isActive = activeTool == item.tool
+                val enabled = when (item.tool) {
+                    EditorTool.Trim, EditorTool.Text, EditorTool.Effects,
+                    EditorTool.Speed, EditorTool.Volume, EditorTool.Adjust,
+                    EditorTool.Transition, EditorTool.Crop, EditorTool.MotionTrack,
+                    EditorTool.ImageOverlay -> hasSelection
+                    else -> true
+                }
+
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable(enabled = enabled) { onToolSelected(item.tool) }
+                        .background(
+                            if (isActive) WorldstarCyan.copy(alpha = 0.12f)
+                            else Color.Transparent
+                        )
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(
+                        imageVector = item.icon,
+                        contentDescription = item.label,
+                        tint = when {
+                            !enabled -> TextDisabledDark
+                            isActive -> WorldstarCyan
+                            else -> TextSecondaryDark
+                        },
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = item.label,
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                        color = when {
+                            !enabled -> TextDisabledDark
+                            isActive -> WorldstarCyan
+                            else -> TextSecondaryDark
+                        }
+                    )
+                }
             }
 
-            IconButton(
-                onClick = { onToolSelected(tool) },
-                enabled = enabled,
+            Spacer(Modifier.width(4.dp))
+
+            // Audio button
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        if (isActive) WorldstarPurpleLight.copy(alpha = 0.2f)
-                        else Color.Transparent
-                    )
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { onAudioClick() }
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
             ) {
                 Icon(
-                    imageVector = icon,
-                    contentDescription = tool.name,
-                    tint = when {
-                        !enabled -> TextDisabledDark
-                        isActive -> WorldstarPurpleLight
-                        else -> TextSecondaryDark
-                    },
+                    imageVector = Icons.Filled.MusicNote,
+                    contentDescription = "Audio",
+                    tint = WorldstarPurpleLight,
                     modifier = Modifier.size(22.dp)
                 )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = "Audio",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                    color = WorldstarPurpleLight
+                )
             }
-        }
-
-        // Audio button (navigates to audio editor)
-        IconButton(
-            onClick = onAudioClick,
-            modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(12.dp))
-        ) {
-            Icon(
-                imageVector = Icons.Filled.MusicNote,
-                contentDescription = "Audio",
-                tint = WorldstarCyan,
-                modifier = Modifier.size(22.dp)
-            )
         }
     }
 }
@@ -665,10 +702,33 @@ private fun ToolPanel(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = SurfaceVariantDark,
-        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+        color = SurfaceDark,
+        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+        shadowElevation = 8.dp
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 220.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(12.dp)
+        ) {
+            // Drag handle indicator
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(32.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(TextDisabledDark.copy(alpha = 0.5f))
+                )
+            }
+
             when (activeTool) {
                 EditorTool.Trim -> TrimTool(
                     clip = selectedClip,
@@ -1611,7 +1671,7 @@ private fun ImageOverlayTool(
     }
 }
 
-// ─── Timeline ────────────────────────────────────────────────────────────────
+// ─── Timeline (Compact Strip) ────────────────────────────────────────────────
 
 @Composable
 private fun Timeline(
@@ -1629,60 +1689,57 @@ private fun Timeline(
     Column(
         modifier = modifier
             .background(TimelineBackground)
-            .padding(top = 8.dp)
     ) {
-        // Timeline header with zoom controls and add media button
+        // Thin separator line
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(TextDisabledDark.copy(alpha = 0.2f))
+        )
+
+        // Zoom + time row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .padding(horizontal = 12.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Playhead time
             Text(
-                text = "Timeline",
-                style = MaterialTheme.typography.labelMedium,
-                color = TextSecondaryDark
+                text = formatTime(playbackPositionMs),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Medium),
+                color = WorldstarCyan
             )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onAddMedia) {
-                    Icon(Icons.Filled.Add, "Add media", tint = WorldstarCyan, modifier = Modifier.size(18.dp))
-                }
-                IconButton(onClick = { onZoomChanged(zoomLevel - 0.25f) }) {
-                    Icon(Icons.Filled.ZoomOut, "Zoom out", tint = TextSecondaryDark, modifier = Modifier.size(18.dp))
-                }
+            Spacer(Modifier.width(8.dp))
+            if (totalDurationMs > 0) {
                 Text(
-                    text = "${(zoomLevel * 100).roundToInt()}%",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextSecondaryDark
+                    text = "/ ${formatTime(totalDurationMs)}",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                    color = TextDisabledDark
                 )
-                IconButton(onClick = { onZoomChanged(zoomLevel + 0.25f) }) {
-                    Icon(Icons.Filled.ZoomIn, "Zoom in", tint = TextSecondaryDark, modifier = Modifier.size(18.dp))
-                }
+            }
+            Spacer(Modifier.weight(1f))
+
+            // Add media button
+            IconButton(onClick = onAddMedia, modifier = Modifier.size(28.dp)) {
+                Icon(Icons.Filled.Add, "Add media", tint = WorldstarCyan, modifier = Modifier.size(16.dp))
+            }
+            // Zoom controls
+            IconButton(onClick = { onZoomChanged(zoomLevel - 0.25f) }, modifier = Modifier.size(28.dp)) {
+                Icon(Icons.Filled.Remove, "Zoom out", tint = TextSecondaryDark, modifier = Modifier.size(14.dp))
+            }
+            Text(
+                text = "${(zoomLevel * 100).roundToInt()}%",
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                color = TextDisabledDark,
+                modifier = Modifier.width(28.dp),
+                textAlign = TextAlign.Center
+            )
+            IconButton(onClick = { onZoomChanged(zoomLevel + 0.25f) }, modifier = Modifier.size(28.dp)) {
+                Icon(Icons.Filled.Add, "Zoom in", tint = TextSecondaryDark, modifier = Modifier.size(14.dp))
             }
         }
-
-        // Time ruler
-        if (totalDurationMs > 0) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                val markers = 5
-                for (i in 0..markers) {
-                    val timeMs = (totalDurationMs * i / markers)
-                    Text(
-                        text = formatTime(timeMs),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextDisabledDark
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.height(4.dp))
 
         // Clips track
         Box(
@@ -1690,7 +1747,7 @@ private fun Timeline(
                 .fillMaxWidth()
                 .weight(1f)
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 12.dp)
+                .padding(horizontal = 8.dp)
         ) {
             if (clips.isEmpty()) {
                 Box(
@@ -1698,67 +1755,52 @@ private fun Timeline(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "No clips — add media to start editing",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextDisabledDark,
-                        textAlign = TextAlign.Center
+                        text = "Tap + to add media",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextDisabledDark
                     )
                 }
             } else {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.padding(vertical = 4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    modifier = Modifier.padding(vertical = 2.dp)
                 ) {
                     clips.forEach { clip ->
                         val isSelected = clip.id == selectedClipId
-                        val widthDp = ((clip.trimmedDurationMs / 1000f) * 40f * zoomLevel).dp.coerceAtLeast(60.dp)
+                        val widthDp = ((clip.trimmedDurationMs / 1000f) * 36f * zoomLevel).dp.coerceAtLeast(48.dp)
 
                         Box(
                             modifier = Modifier
-                                .height(48.dp)
+                                .height(42.dp)
                                 .width(widthDp)
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(6.dp))
                                 .background(
-                                    if (isSelected) TimelineClip.copy(alpha = 0.9f)
-                                    else TimelineClip.copy(alpha = 0.5f)
+                                    if (isSelected) TimelineClip
+                                    else TimelineClip.copy(alpha = 0.4f)
                                 )
                                 .then(
-                                    if (isSelected) Modifier.background(
-                                        brush = Brush.verticalGradient(
-                                            colors = listOf(
-                                                WorldstarPurpleLight.copy(alpha = 0.3f),
-                                                TimelineClip
-                                            )
-                                        )
-                                    ) else Modifier
+                                    if (isSelected) Modifier.border(1.5.dp, WorldstarCyan, RoundedCornerShape(6.dp))
+                                    else Modifier
                                 )
                                 .clickable { onClipSelected(clip.id) }
-                                .padding(6.dp),
+                                .padding(horizontal = 6.dp, vertical = 4.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = if (clip.isImage) Icons.Outlined.Image else Icons.Outlined.Videocam,
-                                        contentDescription = null,
-                                        tint = if (isSelected) Color.White else TextSecondaryDark,
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                    Text(
-                                        text = clip.mediaUri.substringAfterLast("/").take(10),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (isSelected) Color.White else TextSecondaryDark,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (clip.isImage) Icons.Outlined.Image else Icons.Outlined.Videocam,
+                                    contentDescription = null,
+                                    tint = if (isSelected) Color.White else TextSecondaryDark,
+                                    modifier = Modifier.size(12.dp)
+                                )
                                 Text(
                                     text = formatTime(clip.trimmedDurationMs),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = TextDisabledDark
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
+                                    color = if (isSelected) Color.White else TextDisabledDark,
+                                    maxLines = 1
                                 )
                             }
                         }
