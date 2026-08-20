@@ -339,10 +339,11 @@ class VideoEditorViewModel @Inject constructor(
     fun onImageOverlayAdd(imageUri: String) {
         val clip = _uiState.value.selectedClip ?: return
         viewModelScope.launch {
+            val persistedUri = persistStickerImage(imageUri)
             val existing = parseImageOverlays(clip.imageOverlays).toMutableList()
             val newOverlay = ImageOverlay(
                 id = System.nanoTime(),
-                imageUri = imageUri,
+                imageUri = persistedUri,
                 posX = 0.5f,
                 posY = 0.5f,
                 sizeScale = 0.3f
@@ -351,6 +352,34 @@ class VideoEditorViewModel @Inject constructor(
             val json = serializeImageOverlays(existing)
             updateClipUseCase(clip.copy(imageOverlays = json))
             _uiState.update { it.copy(selectedTextOverlayId = newOverlay.id) }
+        }
+    }
+
+    private fun persistStickerImage(originalUriString: String): String {
+        return try {
+            val uri = Uri.parse(originalUriString)
+            // Already a persisted file URI — keep as is
+            if (originalUriString.startsWith("file://") ||
+                originalUriString.startsWith(application.filesDir.absolutePath)
+            ) {
+                return originalUriString
+            }
+            val input = application.contentResolver.openInputStream(uri) ?: return originalUriString
+            val dir = java.io.File(application.filesDir, "stickers")
+            if (!dir.exists()) dir.mkdirs()
+            val mime = application.contentResolver.getType(uri) ?: "image/jpeg"
+            val ext = when {
+                mime.contains("png", ignoreCase = true) -> ".png"
+                mime.contains("webp", ignoreCase = true) -> ".webp"
+                else -> ".jpg"
+            }
+            val dest = java.io.File(dir, "sticker_${System.currentTimeMillis()}_${(0..9999).random()}$ext")
+            input.use { ins ->
+                dest.outputStream().use { out -> ins.copyTo(out) }
+            }
+            Uri.fromFile(dest).toString()
+        } catch (_: Exception) {
+            originalUriString
         }
     }
 
