@@ -1536,14 +1536,14 @@ private fun DraggableImage(
                 }
                 .onSizeChanged { imgSize = it }
                 .then(
-                    if (isSelected) Modifier.border(2.dp, WorldstarCyan, RoundedCornerShape(4.dp))
+                    if (isSelected) Modifier.border(1.5.dp, WorldstarCyan, RoundedCornerShape(4.dp))
                     else Modifier
                 )
         ) {
             coil.compose.AsyncImage(
                 model = imageUri,
                 contentDescription = null,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.sizeIn(maxWidth = 180.dp, maxHeight = 180.dp),
                 contentScale = ContentScale.Fit
             )
         }
