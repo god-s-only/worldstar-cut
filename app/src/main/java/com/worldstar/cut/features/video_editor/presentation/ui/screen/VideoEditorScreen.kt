@@ -507,6 +507,9 @@ private fun VideoPreview(
                     rotation = overlay.rotation,
                     color = overlay.color,
                     fontFamilyName = overlay.fontFamily,
+                    animation = overlay.animation,
+                    playbackMs = playbackMs,
+                    isPlaying = isPlaying,
                     isSelected = selectedOverlayId == overlay.id,
                     onSelect = onOverlaySelected,
                     onTransformChanged = onOverlayTransformChanged
@@ -1360,6 +1363,9 @@ private fun DraggableText(
     rotation: Float,
     color: Int = Color.White.hashCode(),
     fontFamilyName: String = "default",
+    animation: String = "none",
+    playbackMs: Long = 0L,
+    isPlaying: Boolean = false,
     isSelected: Boolean,
     onSelect: (Long) -> Unit,
     onTransformChanged: (Long, Float, Float, Float, Float) -> Unit
@@ -1386,6 +1392,22 @@ private fun DraggableText(
         angle = rotation
     }
 
+    // CapCut-style animation (progress 0..1 from playbackMs)
+    val animDuration = 600L
+    val animProgress = when {
+        animation == "none" -> 1f
+        isPlaying && playbackMs in 0..animDuration -> playbackMs.toFloat() / animDuration
+        isPlaying && playbackMs > animDuration -> 1f
+        else -> 1f
+    }
+    val displayedText = if (animation == "typewriter" && isPlaying && playbackMs in 0..animDuration) {
+        val len = (text.length * animProgress).toInt().coerceIn(0, text.length)
+        if (len <= 0) " " else text.take(len)
+    } else text
+    val glitchOffsetX = if (animation == "glitch" && animProgress < 1f) {
+        (kotlin.random.Random.nextFloat() - 0.5f) * 16f * (1f - animProgress)
+    } else 0f
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1402,8 +1424,26 @@ private fun DraggableText(
                     )
                 }
                 .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
+                    var a = 1f
+                    var tx = 0f
+                    var ty = 0f
+                    var sFactor = 1f
+                    when (animation) {
+                        "fade" -> a = animProgress
+                        "slide_up" -> { ty = (1f - animProgress) * 80f; a = animProgress }
+                        "slide_down" -> { ty = -(1f - animProgress) * 80f; a = animProgress }
+                        "slide_left" -> { tx = (1f - animProgress) * 80f; a = animProgress }
+                        "slide_right" -> { tx = -(1f - animProgress) * 80f; a = animProgress }
+                        "scale" -> { sFactor = 0.3f + 0.7f * animProgress; a = animProgress }
+                        "glitch" -> { tx = glitchOffsetX; a = animProgress }
+                        "wave" -> { ty = kotlin.math.sin(animProgress * Math.PI * 4).toFloat() * 10f }
+                        else -> {}
+                    }
+                    alpha = a
+                    translationX = tx
+                    translationY = ty
+                    scaleX = scale * sFactor
+                    scaleY = scale * sFactor
                     rotationZ = angle
                 }
                 .clickable(
@@ -1430,7 +1470,7 @@ private fun DraggableText(
                 .padding(horizontal = 10.dp, vertical = 4.dp)
         ) {
             Text(
-                text = text,
+                text = displayedText,
                 fontSize = (24 * scale).sp,
                 color = Color(color),
                 fontFamily = textFontFamily,
