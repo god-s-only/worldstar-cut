@@ -23,12 +23,14 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
 
-    # Storage (S3 / MinIO)
-    S3_BUCKET: str = "worldstarcut"
-    S3_REGION: str = "us-east-1"
-    S3_ACCESS_KEY: str = ""
-    S3_SECRET_KEY: str = ""
-    S3_ENDPOINT_URL: str = ""  # e.g. http://localhost:9000 for MinIO
+    # Storage — OCI Object Storage (S3-compatible API; MinIO for local dev)
+    OBJECT_STORAGE_ENDPOINT_URL: str = ""  # e.g. https://<namespace>.compat.objectstorage.me-jeddah-1.oraclecloud.com or http://localhost:9000
+    OBJECT_STORAGE_REGION: str = "me-jeddah-1"
+    OBJECT_STORAGE_ACCESS_KEY: str = ""  # OCI Customer Secret Key — Access Key
+    OBJECT_STORAGE_SECRET_KEY: str = ""  # OCI Customer Secret Key — Secret
+    OBJECT_STORAGE_BUCKET_PACKS: str = "wsc-packs"
+    OBJECT_STORAGE_BUCKET_PREVIEWS: str = "wsc-previews"
+    OBJECT_STORAGE_BUCKET_EXPORTS: str = "wsc-exports"
 
     # Stripe
     STRIPE_SECRET_KEY: str = ""

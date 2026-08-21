@@ -1,17 +1,17 @@
 # WorldstarCut Backend — Build Plan
 
-> FastAPI + Postgres + Redis + S3 + Stripe. Marketplace where any user can create account and sell sticker/animation packs. Mobile client is Android (Kotlin, Compose, Media3).
+> FastAPI + Postgres + Redis + OCI Object Storage + Stripe. Marketplace where any user can create account and sell sticker/animation packs. Mobile client is Android (Kotlin, Compose, Media3). Infra runs on Oracle Cloud (OCI).
 
 ## 0. Stack
 - **API:** FastAPI 0.115, Pydantic 2, `pydantic-settings`
 - **DB:** Postgres 16, SQLAlchemy 2 async, Alembic, `asyncpg`
 - **Cache/Queue:** Redis + Celery (or ARQ) for moderation, thumbnail generation, payouts
-- **Storage:** S3 / MinIO (via `boto3`) — buckets: `wsc-packs`, `wsc-previews`, `wsc-exports`
+- **Storage:** OCI Object Storage (S3-compatible API via `boto3`; MinIO for local dev) — buckets: `wsc-packs`, `wsc-previews`, `wsc-exports`
 - **Auth:** JWT (`python-jose` + `passlib[bcrypt]`), OAuth2 password flow; Google OAuth via `httpx`
 - **Payments:** Stripe + Stripe Connect Express (KYC for sellers), webhooks
 - **Search:** Postgres `tsvector`/`pg_trgm` initially, Meilisearch later
-- **Moderation:** AWS Rekognition / Google Vision (NSFW) + manual review queue
-- **Deploy:** Docker, `docker-compose` (api, db, redis, worker), Alembic migrations
+- **Moderation:** OCI Vision (NSFW) + manual review queue
+- **Deploy:** Docker on OCI Compute (docker-compose: api, db, redis, worker), Alembic migrations; OKE later if needed
 
 ## 1. Project Structure (target)
 ```
@@ -110,7 +110,8 @@ backend/
 - On listing create: worker runs Vision (NSFW, copyright via image hash), writes `review_queue`, auto-reject if score > threshold else `pending` for manual.
 - `GET /api/v1/admin/review-queue` (admin role) + `POST /{id}/approve` / `reject` → updates `listings.status`, moves files `pending_packs/` → `public_packs/`.
 
-## 7. Storage
+## 7. Storage (OCI Object Storage — S3-compatible)
+- `boto3` client with `endpoint_url=https://<namespace>.compat.objectstorage.<region>.oraclecloud.com`, auth via OCI Customer Secret Keys
 - `s3.upload_fileobj` with content-type sniff, `CacheControl: max-age=31536000`
 - Previews: 512x512 webp generated via Pillow worker
 - Presigned GET 3600s for downloads; PUT via presigned POST for uploads (or direct multipart via API).
@@ -134,7 +135,7 @@ backend/
 6. **Admin + payouts** — Connect transfers, cron
 
 ## 11. Env & Run
-- `cp .env.example .env` → set `DATABASE_URL`, `REDIS_URL`, `S3_*`, `STRIPE_*`, `SECRET_KEY`
+- `cp .env.example .env` → set `DATABASE_URL`, `REDIS_URL`, `OBJECT_STORAGE_*`, `STRIPE_*`, `SECRET_KEY`
 - `alembic upgrade head` → `uvicorn app.main:app --reload`
 - `celery -A app.workers.celery worker -l info` + `beat`
 - `docker-compose up --build` for full stack
