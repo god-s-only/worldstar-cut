@@ -3,6 +3,10 @@ package com.worldstar.cut.features.video_editor.presentation.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.worldstar.cut.core.domain.result.Result
+import android.app.Application
+import android.graphics.Bitmap
+import android.media.MediaMetadataRetriever
+import android.net.Uri
 import com.worldstar.cut.features.video_editor.data.local.db.ClipDao
 import com.worldstar.cut.features.video_editor.data.local.db.TrackDao
 import com.worldstar.cut.features.video_editor.domain.model.Project
@@ -11,6 +15,7 @@ import com.worldstar.cut.features.video_editor.domain.usecase.DeleteProjectUseCa
 import com.worldstar.cut.features.video_editor.domain.usecase.GetAllProjectsUseCase
 import com.worldstar.cut.features.video_editor.domain.usecase.UpdateProjectUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -20,10 +25,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
+    private val application: Application,
     private val getAllProjectsUseCase: GetAllProjectsUseCase,
     private val createProjectUseCase: CreateProjectUseCase,
     private val deleteProjectUseCase: DeleteProjectUseCase,
@@ -92,8 +100,8 @@ class HomeViewModel @Inject constructor(
                                 errorMessage = null
                             )
                         }
-                        // Load thumbnails (first frame of video / image)
-                        viewModelScope.launch {
+                        // Load thumbnails — image: direct uri, video: generate via MediaMetadataRetriever and cache as file
+                        viewModelScope.launch(Dispatchers.IO) {
                             val thumbs = mutableMapOf<Long, String>()
                             result.data.forEach { project ->
                                 try {
@@ -106,7 +114,19 @@ class HomeViewModel @Inject constructor(
                                         if (videoTrack != null) {
                                             val clips = clipDao.getClipsListForTrack(videoTrack.id)
                                             val firstClip = clips.firstOrNull()
-                                            if (firstClip != null) thumbs[project.id] = firstClip.mediaUri
+                                            if (firstClip != null) {
+                                                if (firstClip.mediaType == "image") {
+                                                    thumbs[project.id] = firstClip.mediaUri
+                                                } else {
+                                                    val thumbFile = File(application.filesDir, "thumbs/thumb_${project.id}.jpg")
+                                                    if (thumbFile.exists() && thumbFile.length() > 0) {
+                                                        thumbs[project.id] = thumbFile.absolutePath
+                                                    } else {
+                                                        val generated = generateVideoThumbnail(firstClip.mediaUri, thumbFile)
+                                                        thumbs[project.id] = generated ?: firstClip.mediaUri
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 } catch (_: Exception) {}
@@ -128,6 +148,21 @@ class HomeViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    private fun generateVideoThumbnail(videoUri: String, destFile: File): String? {
+        return try {
+            destFile.parentFile?.mkdirs()
+            val retriever = MediaMetadataRetriever()
+            retriever.setDataSource(application, Uri.parse(videoUri))
+            val bmp = retriever.getFrameAtTime(500_000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+            retriever.release()
+            if (bmp != null) {
+                destFile.outputStream().use { out -> bmp.compress(Bitmap.CompressFormat.JPEG, 85, out) }
+                bmp.recycle()
+                destFile.absolutePath
+            } else null
+        } catch (_: Exception) { null }
     }
 }
 
