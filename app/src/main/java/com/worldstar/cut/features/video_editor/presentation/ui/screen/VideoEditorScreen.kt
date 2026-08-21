@@ -1575,6 +1575,60 @@ private fun CaptionsTool(
 }
 
 @Composable
+private fun BackgroundRemoveTool(
+    clip: Clip?,
+    onBackgroundEffectChanged: (String?, String?) -> Unit
+) {
+    val currentEffect = clip?.backgroundEffect ?: "none"
+    val effects = listOf("None" to "none", "Blur" to "blur", "Color" to "color", "Image" to "image")
+    val colors = listOf(Color(0xFF00BCD4), Color(0xFF4CAF50), Color(0xFFFFC107), Color(0xFFE91E63), Color.Black, Color.White)
+    Column {
+        Text("Background Remove — AI", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
+        Spacer(Modifier.height(4.dp))
+        Text("ML Kit selfie segmentation + blur/color/image BG", style = MaterialTheme.typography.labelSmall, color = TextDisabledDark)
+        Spacer(Modifier.height(12.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(effects) { (label, key) ->
+                FilterChip(
+                    selected = currentEffect == key,
+                    onClick = { onBackgroundEffectChanged(if (key == "none") null else key, null) },
+                    label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = WorldstarPurpleLight,
+                        selectedLabelColor = Color.White,
+                        containerColor = SurfaceDark,
+                        labelColor = TextSecondaryDark
+                    )
+                )
+            }
+        }
+        if (currentEffect == "color") {
+            Spacer(Modifier.height(12.dp))
+            Text("Background Color", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
+            Spacer(Modifier.height(8.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(colors) { c ->
+                    val hex = String.format("#%06X", 0xFFFFFF and c.hashCode())
+                    val isSelected = clip?.backgroundEffectValue == hex
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(c)
+                            .border(if (isSelected) 2.dp else 1.dp, if (isSelected) WorldstarCyan else Color.White.copy(alpha = 0.3f), CircleShape)
+                            .clickable { onBackgroundEffectChanged("color", hex) }
+                    )
+                }
+            }
+        }
+        if (currentEffect == "blur") {
+            Spacer(Modifier.height(8.dp))
+            Text("Preview shows blur — export will bake via ML Kit mask", style = MaterialTheme.typography.labelSmall, color = TextDisabledDark)
+        }
+    }
+}
+
+@Composable
 private fun TransitionTool(
     clip: Clip?,
     onTransitionChanged: (String?) -> Unit
