@@ -221,6 +221,13 @@ class VideoEditorViewModel @Inject constructor(
         }
     }
 
+    fun onBackgroundEffectChanged(effect: String?, value: String? = null) {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            updateClipUseCase(clip.copy(backgroundEffect = effect, backgroundEffectValue = value))
+        }
+    }
+
     // ─── Volume keyframes (audio ducking) ─────────────────────────────────────
 
     fun onVolumeKeyframeAdd(timeMs: Long, volume: Float) {
