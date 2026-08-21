@@ -5,5 +5,3 @@ venv/
 .env
 .pytest_cache/
 .mypy_cache/
-alembic/versions/*.py
-!alembic/versions/.gitkeep
