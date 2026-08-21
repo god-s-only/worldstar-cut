@@ -35,7 +35,9 @@ data class Clip(
     val imageOverlays: String? = null,
     val motionEffect: String? = null,
     val volumeKeyframes: String? = null,
-    val motionSegments: String? = null
+    val motionSegments: String? = null,
+    val backgroundEffect: String? = null,
+    val backgroundEffectValue: String? = null
 ) {
     val trimmedDurationMs: Long
         get() = (endMs - startMs) - (trimStartMs + trimEndMs)
