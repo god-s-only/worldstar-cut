@@ -1838,6 +1838,36 @@ private fun VolumeTool(
         Divider(color = TextDisabledDark.copy(alpha = 0.2f))
         Spacer(Modifier.height(12.dp))
 
+        // Waveform preview — SaaS polish for audio lane
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(32.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(SurfaceVariantDark)
+                .padding(horizontal = 8.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                repeat(48) { i ->
+                    val h = (6 + kotlin.math.abs(kotlin.math.sin(i * 0.7)) * 14).dp
+                    Box(
+                        modifier = Modifier
+                            .width(3.dp)
+                            .height(h)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(WorldstarCyan.copy(alpha = 0.55f))
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(10.dp))
+
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text("Ducking Keyframes", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
             Spacer(Modifier.weight(1f))
@@ -2839,6 +2869,24 @@ private fun Timeline(
                     ) {
                         val totalWidth = (totalDurationMs.coerceAtLeast(1000L) / 1000f * 36f * zoomLevel).dp.coerceAtLeast(200.dp)
                         Box(modifier = Modifier.width(totalWidth).height(16.dp)) {
+                            // Faux waveform — SaaS polish
+                            Row(
+                                modifier = Modifier.fillMaxSize(),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val barCount = (totalWidth.value / 4).toInt().coerceIn(24, 100)
+                                repeat(barCount) { i ->
+                                    val h = (4 + kotlin.math.abs(kotlin.math.sin(i * 0.6)) * 8 + (i % 3) * 2).dp
+                                    Box(
+                                        modifier = Modifier
+                                            .width(2.dp)
+                                            .height(h)
+                                            .clip(RoundedCornerShape(1.dp))
+                                            .background(Color.White.copy(alpha = 0.18f))
+                                    )
+                                }
+                            }
                             volumeKfs.forEach { kf ->
                                 val offsetX = ((kf.timeMs / 1000f) * 36f * zoomLevel).dp
                                 Box(
