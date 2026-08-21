@@ -282,6 +282,8 @@ fun VideoEditorScreen(
                     selectedClip = uiState.selectedClip,
                     selectedTextOverlayId = uiState.selectedTextOverlayId,
                 onTextOverlaySelected = viewModel::onTextOverlaySelected,
+                onTextOverlayTimingUpdate = viewModel::onTextOverlayTimingChanged,
+                onImageOverlayTimingUpdate = viewModel::onImageOverlayTimingChanged,
                 onMotionSegmentUpdate = viewModel::onMotionSegmentUpdate,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -2598,6 +2600,8 @@ private fun Timeline(
     selectedClip: Clip? = null,
     selectedTextOverlayId: Long? = null,
     onTextOverlaySelected: (Long) -> Unit = {},
+    onTextOverlayTimingUpdate: (Long, Long, Long) -> Unit = { _, _, _ -> },
+    onImageOverlayTimingUpdate: (Long, Long, Long) -> Unit = { _, _, _ -> },
     onMotionSegmentUpdate: (Long, String, Long, Long) -> Unit = { _, _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
@@ -2766,6 +2770,15 @@ private fun Timeline(
                                         .clip(RoundedCornerShape(4.dp))
                                         .background(if (isSelected) WorldstarCyan else WorldstarPurpleLight.copy(alpha = 0.6f))
                                         .border(if (isSelected) 1.dp else 0.dp, Color.White, RoundedCornerShape(4.dp))
+                                        .pointerInput(overlay.id, zoomLevel) {
+                                            detectHorizontalDragGestures { _, dragAmount ->
+                                                val deltaMs = (dragAmount / (36f * zoomLevel) * 200).toLong()
+                                                val clipDur = selectedClip?.trimmedDurationMs?.takeIf { it > 0 } ?: selectedClip?.durationMs?.takeIf { it > 0 } ?: 5000L
+                                                val maxStart = (clipDur - overlay.durationMs).coerceAtLeast(0L)
+                                                val newStart = (overlay.startMs + deltaMs).coerceIn(0L, maxStart)
+                                                onTextOverlayTimingUpdate(overlay.id, newStart, overlay.durationMs)
+                                            }
+                                        }
                                         .clickable { onTextOverlaySelected(overlay.id) }
                                         .padding(horizontal = 4.dp),
                                     contentAlignment = Alignment.CenterStart
@@ -2824,6 +2837,15 @@ private fun Timeline(
                                         .clip(RoundedCornerShape(4.dp))
                                         .background(if (isSelected) WorldstarCyan else Color(0xFFFF9800).copy(alpha = 0.7f))
                                         .border(if (isSelected) 1.dp else 0.dp, Color.White, RoundedCornerShape(4.dp))
+                                        .pointerInput(overlay.id, zoomLevel) {
+                                            detectHorizontalDragGestures { _, dragAmount ->
+                                                val deltaMs = (dragAmount / (36f * zoomLevel) * 200).toLong()
+                                                val clipDur = selectedClip?.trimmedDurationMs?.takeIf { it > 0 } ?: selectedClip?.durationMs?.takeIf { it > 0 } ?: 5000L
+                                                val maxStart = (clipDur - overlay.durationMs).coerceAtLeast(0L)
+                                                val newStart = (overlay.startMs + deltaMs).coerceIn(0L, maxStart)
+                                                onImageOverlayTimingUpdate(overlay.id, newStart, overlay.durationMs)
+                                            }
+                                        }
                                         .clickable { onTextOverlaySelected(overlay.id) }
                                         .padding(horizontal = 4.dp),
                                     contentAlignment = Alignment.CenterStart
