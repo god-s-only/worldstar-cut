@@ -12,14 +12,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -56,17 +54,12 @@ fun HomeScreen(
         }
     }
 
-    // Delete dialog
     uiState.showDeleteDialog?.let { project ->
         AlertDialog(
             onDismissRequest = viewModel::onDeleteDismissed,
             containerColor = SurfaceDark,
-            title = {
-                Text("Delete project?", color = TextPrimaryDark, fontWeight = FontWeight.SemiBold)
-            },
-            text = {
-                Text("\"${project.name}\" will be permanently deleted.", color = TextSecondaryDark)
-            },
+            title = { Text("Delete project?", color = TextPrimaryDark, fontWeight = FontWeight.SemiBold) },
+            text = { Text("\"${project.name}\" will be permanently deleted.", color = TextSecondaryDark) },
             confirmButton = {
                 TextButton(
                     onClick = viewModel::onDeleteConfirmed,
@@ -74,14 +67,11 @@ fun HomeScreen(
                 ) { Text("Delete") }
             },
             dismissButton = {
-                TextButton(onClick = viewModel::onDeleteDismissed) {
-                    Text("Cancel", color = TextSecondaryDark)
-                }
+                TextButton(onClick = viewModel::onDeleteDismissed) { Text("Cancel", color = TextSecondaryDark) }
             }
         )
     }
 
-    // Context menu (long-press)
     uiState.contextMenuProject?.let { project ->
         ProjectContextMenu(
             project = project,
@@ -94,39 +84,51 @@ fun HomeScreen(
     Scaffold(
         containerColor = BackgroundDark,
         topBar = {
-            TopAppBar(
+            CenterAlignedTopAppBar(
                 title = {
-                    Column {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = "WorldstarCut",
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = TextPrimaryDark
+                            color = TextPrimaryDark,
+                            letterSpacing = 0.5f.dp.toSp()
                         )
                         Text(
-                            text = "Professional studio",
+                            text = "${uiState.projects.size} projects • Pro studio",
                             style = MaterialTheme.typography.labelSmall,
                             color = TextSecondaryDark
                         )
                     }
                 },
-                actions = {
-                    IconButton(onClick = onPremiumClick) {
-                        Icon(Icons.Outlined.Star, contentDescription = "Premium", tint = WorldstarGold)
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = BackgroundDark),
+                navigationIcon = {
+                    Surface(shape = CircleShape, color = SurfaceVariantDark, modifier = Modifier.padding(start = 12.dp).size(36.dp)) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Text("W", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = WorldstarPurpleLight)
+                        }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
+                actions = {
+                    IconButton(onClick = onPremiumClick) {
+                        Surface(shape = CircleShape, color = WorldstarGold.copy(alpha = 0.15f), modifier = Modifier.size(36.dp)) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                Icon(Icons.Outlined.Star, contentDescription = "Premium", tint = WorldstarGold, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                }
             )
         },
         floatingActionButton = {
-            SmallFloatingActionButton(
+            ExtendedFloatingActionButton(
                 onClick = onNewVideoClick,
                 containerColor = WorldstarPurpleLight,
                 contentColor = Color.White,
-                shape = CircleShape
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "New project")
-            }
+                shape = RoundedCornerShape(14.dp),
+                icon = { Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                text = { Text("New", fontWeight = FontWeight.SemiBold) }
+            )
         }
     ) { paddingValues ->
         Column(
@@ -134,69 +136,114 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Hero create section — SaaS gradient cards
-            Row(
+            // Stats + quick create — SaaS header
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                SaasCreateCard(
-                    icon = Icons.Outlined.Videocam,
-                    title = "New Video",
-                    subtitle = "Edit video • 16:9 / 9:16",
-                    gradient = Brush.linearGradient(listOf(WorldstarPurple, WorldstarPurpleLight)),
-                    onClick = onNewVideoClick,
-                    modifier = Modifier.weight(1f)
-                )
-                SaasCreateCard(
-                    icon = Icons.Outlined.PhotoLibrary,
-                    title = "New Photo",
-                    subtitle = "Photo edit • Canvas",
-                    gradient = Brush.linearGradient(listOf(WorldstarPink, WorldstarCyan)),
-                    onClick = onNewPhotoClick,
-                    modifier = Modifier.weight(1f)
-                )
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Create new", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = TextPrimaryDark)
+                            Text("Start from video or photo", style = MaterialTheme.typography.labelSmall, color = TextSecondaryDark)
+                        }
+                        Text(
+                            text = "${uiState.projects.size} total",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextDisabledDark,
+                            modifier = Modifier
+                                .background(SurfaceVariantDark, RoundedCornerShape(8.dp))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(88.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .clickable(onClick = onNewVideoClick),
+                            color = SurfaceVariantDark,
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(14.dp),
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Surface(shape = CircleShape, color = WorldstarPurpleLight.copy(alpha = 0.15f), modifier = Modifier.size(36.dp)) {
+                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                        Icon(Icons.Outlined.Videocam, contentDescription = null, tint = WorldstarPurpleLight, modifier = Modifier.size(20.dp))
+                                    }
+                                }
+                                Spacer(Modifier.height(10.dp))
+                                Text("New Video", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = TextPrimaryDark)
+                                Text("16:9 • 9:16 • 1:1", style = MaterialTheme.typography.labelSmall, color = TextDisabledDark)
+                            }
+                        }
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(88.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .clickable(onClick = onNewPhotoClick),
+                            color = SurfaceVariantDark,
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(14.dp),
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Surface(shape = CircleShape, color = WorldstarCyan.copy(alpha = 0.15f), modifier = Modifier.size(36.dp)) {
+                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                        Icon(Icons.Outlined.PhotoLibrary, contentDescription = null, tint = WorldstarCyan, modifier = Modifier.size(20.dp))
+                                    }
+                                }
+                                Spacer(Modifier.height(10.dp))
+                                Text("New Photo", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = TextPrimaryDark)
+                                Text("Canvas • Stories", style = MaterialTheme.typography.labelSmall, color = TextDisabledDark)
+                            }
+                        }
+                    }
+                }
             }
 
-            HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                color = SurfaceVariantDark
-            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp), color = SurfaceVariantDark.copy(alpha = 0.5f))
 
-            // Projects header
+            // Projects
             if (uiState.hasProjects) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Projects",
+                        text = "Recent",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = TextPrimaryDark
                     )
                     Spacer(Modifier.width(8.dp))
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = WorldstarPurpleLight.copy(alpha = 0.15f)
-                    ) {
-                        Text(
-                            text = "${uiState.projects.size}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = WorldstarPurpleLight,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                        )
-                    }
-                    Spacer(Modifier.weight(1f))
                     Text(
-                        text = "Long-press to manage",
+                        text = "${uiState.projects.size}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = TextDisabledDark
+                        color = TextSecondaryDark,
+                        modifier = Modifier
+                            .background(SurfaceVariantDark, RoundedCornerShape(8.dp))
+                            .padding(horizontal = 7.dp, vertical = 2.dp)
                     )
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = {}, enabled = false) {
+                        Text("See all", style = MaterialTheme.typography.labelSmall, color = TextDisabledDark)
+                    }
                 }
 
                 ProjectGrid(
@@ -212,81 +259,7 @@ fun HomeScreen(
     }
 }
 
-@Composable
-private fun SaasCreateCard(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    subtitle: String,
-    gradient: Brush,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier
-            .height(96.dp)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(gradient)
-                .padding(14.dp)
-        ) {
-            Column(modifier = Modifier.align(Alignment.TopStart)) {
-                Surface(
-                    shape = CircleShape,
-                    color = Color.White.copy(alpha = 0.2f),
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                    }
-                }
-                Spacer(Modifier.height(10.dp))
-                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
-                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.85f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-    }
-}
-
-@Composable
-private fun QuickActionChip(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier
-            .height(44.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick),
-        color = SurfaceDark
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = WorldstarPurpleLight,
-                modifier = Modifier.size(18.dp)
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Medium,
-                color = TextPrimaryDark
-            )
-        }
-    }
-}
+private fun androidx.compose.ui.unit.Dp.toSp() = androidx.compose.ui.unit.TextUnit(this.value, androidx.compose.ui.unit.TextUnitType.Sp)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -329,13 +302,10 @@ private fun ProjectCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick
-            ),
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = SurfaceDark),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column {
             Box(
@@ -346,43 +316,28 @@ private fun ProjectCard(
                     .background(SurfaceVariantDark),
                 contentAlignment = Alignment.Center
             ) {
-                // Thumbnail — first frame of video or image
-                if (thumbnailUri != null) {
+                if (thumbnailUri != null || project.thumbnailPath != null) {
+                    val uri = thumbnailUri ?: project.thumbnailPath!!
                     AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(thumbnailUri)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else if (project.thumbnailPath != null) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(project.thumbnailPath)
-                            .crossfade(true)
-                            .build(),
+                        model = ImageRequest.Builder(context).data(uri).crossfade(true).build(),
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
                 } else {
                     Icon(
-                        imageVector = Icons.Outlined.PlayCircleOutline,
+                        imageVector = Icons.Outlined.Movie,
                         contentDescription = null,
                         tint = TextDisabledDark,
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(28.dp)
                     )
                 }
-
-                // Duration badge
                 if (project.durationMs > 0) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(8.dp)
-                            .background(Color.Black.copy(alpha = 0.75f), RoundedCornerShape(6.dp))
+                            .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(6.dp))
                             .padding(horizontal = 6.dp, vertical = 3.dp)
                     ) {
                         Text(
@@ -393,51 +348,36 @@ private fun ProjectCard(
                         )
                     }
                 }
-
-                // Exported dot
                 if (project.isExported) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopStart)
                             .padding(8.dp)
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(WorldstarCyan)
-                    )
+                            .background(WorldstarCyan, CircleShape)
+                            .padding(4.dp)
+                    ) {
+                        Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
+                    }
                 }
-
-                // Subtle gradient scrim for legibility
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.25f)),
-                                startY = 300f
-                            )
-                        )
-                )
             }
-
             Column(modifier = Modifier.padding(12.dp)) {
                 Text(
                     text = project.name,
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Medium,
                     color = TextPrimaryDark,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(3.dp))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Icon(Icons.Outlined.Schedule, contentDescription = null, tint = TextDisabledDark, modifier = Modifier.size(12.dp))
                     Text(
                         text = formatProjectDate(project.updatedAt),
                         style = MaterialTheme.typography.labelSmall,
-                        color = TextDisabledDark
+                        color = TextSecondaryDark
                     )
                     if (project.durationMs > 0) {
-                        Text("•", style = MaterialTheme.typography.labelSmall, color = TextDisabledDark)
+                        Box(modifier = Modifier.size(3.dp).background(TextDisabledDark, CircleShape))
                         Text(
                             text = project.resolutionLabel,
                             style = MaterialTheme.typography.labelSmall,
@@ -450,8 +390,6 @@ private fun ProjectCard(
     }
 }
 
-// ─── Context Menu (long-press) ───────────────────────────────────────────────
-
 @Composable
 private fun ProjectContextMenu(
     project: Project,
@@ -460,53 +398,26 @@ private fun ProjectContextMenu(
     onDelete: () -> Unit
 ) {
     var showRenameDialog by remember { mutableStateOf(false) }
-
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = SurfaceDark,
-        title = {
-            Text(
-                text = project.name,
-                color = TextPrimaryDark,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        },
+        title = { Text(project.name, color = TextPrimaryDark, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable { showRenameDialog = true },
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { showRenameDialog = true },
                     color = SurfaceVariantDark
                 ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
+                    Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Icon(Icons.Outlined.Edit, contentDescription = null, tint = TextSecondaryDark, modifier = Modifier.size(20.dp))
                         Text("Rename", color = TextPrimaryDark, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
-
                 Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable {
-                            onDismiss()
-                            onDelete()
-                        },
+                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { onDismiss(); onDelete() },
                     color = SurfaceVariantDark
                 ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
+                    Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Icon(Icons.Outlined.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
                         Text("Delete", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
                     }
@@ -514,40 +425,20 @@ private fun ProjectContextMenu(
             }
         },
         confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = TextSecondaryDark)
-            }
-        }
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = TextSecondaryDark) } }
     )
-
-    // Rename dialog
     if (showRenameDialog) {
-        RenameProjectDialog(
-            currentName = project.name,
-            onConfirm = { newName ->
-                onRename(newName)
-                showRenameDialog = false
-            },
-            onDismiss = { showRenameDialog = false }
-        )
+        RenameProjectDialog(currentName = project.name, onConfirm = { newName -> onRename(newName); showRenameDialog = false }, onDismiss = { showRenameDialog = false })
     }
 }
 
 @Composable
-private fun RenameProjectDialog(
-    currentName: String,
-    onConfirm: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
+private fun RenameProjectDialog(currentName: String, onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
     var name by remember { mutableStateOf(currentName) }
-
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = SurfaceDark,
-        title = {
-            Text("Rename project", color = TextPrimaryDark, fontWeight = FontWeight.SemiBold)
-        },
+        title = { Text("Rename project", color = TextPrimaryDark, fontWeight = FontWeight.SemiBold) },
         text = {
             OutlinedTextField(
                 value = name,
@@ -565,60 +456,26 @@ private fun RenameProjectDialog(
                 modifier = Modifier.fillMaxWidth()
             )
         },
-        confirmButton = {
-            TextButton(
-                onClick = { onConfirm(name) },
-                enabled = name.isNotBlank() && name != currentName
-            ) {
-                Text("Save", color = WorldstarPurpleLight)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = TextSecondaryDark)
-            }
-        }
+        confirmButton = { TextButton(onClick = { onConfirm(name) }, enabled = name.isNotBlank() && name != currentName) { Text("Save", color = WorldstarPurpleLight) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = TextSecondaryDark) } }
     )
 }
-
-// ─── Empty State ─────────────────────────────────────────────────────────────
 
 @Composable
 private fun EmptyProjectsState() {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 32.dp, vertical = 64.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 48.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Surface(
-            shape = CircleShape,
-            color = SurfaceVariantDark,
-            modifier = Modifier.size(72.dp)
-        ) {
+        Surface(shape = CircleShape, color = SurfaceVariantDark, modifier = Modifier.size(72.dp)) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                Icon(
-                    imageVector = Icons.Outlined.VideoLibrary,
-                    contentDescription = null,
-                    tint = TextDisabledDark,
-                    modifier = Modifier.size(32.dp)
-                )
+                Icon(Icons.Outlined.VideoLibrary, contentDescription = null, tint = TextDisabledDark, modifier = Modifier.size(32.dp))
             }
         }
         Spacer(Modifier.height(16.dp))
-        Text(
-            text = "No projects yet",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = TextPrimaryDark
-        )
+        Text("No projects yet", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = TextPrimaryDark)
         Spacer(Modifier.height(6.dp))
-        Text(
-            text = "Create your first video or photo project. Your edits autosave.",
-            style = MaterialTheme.typography.bodySmall,
-            color = TextDisabledDark,
-            textAlign = TextAlign.Center
-        )
+        Text("Create your first video or photo project. Your edits autosave.", style = MaterialTheme.typography.bodySmall, color = TextDisabledDark, textAlign = TextAlign.Center)
     }
 }
 
