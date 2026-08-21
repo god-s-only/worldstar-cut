@@ -18,3 +18,4 @@ Base.metadata.naming_convention = NAMING_CONVENTION
 # Import models so Alembic autogenerate sees every table.
 # Plain imports (no attribute access) keep partial-init circulars safe.
 import app.models.user  # noqa: E402,F401
+import app.models.pack  # noqa: E402,F401
