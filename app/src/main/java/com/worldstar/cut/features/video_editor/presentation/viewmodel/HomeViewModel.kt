@@ -3,6 +3,8 @@ package com.worldstar.cut.features.video_editor.presentation.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.worldstar.cut.core.domain.result.Result
+import com.worldstar.cut.features.video_editor.data.local.db.ClipDao
+import com.worldstar.cut.features.video_editor.data.local.db.TrackDao
 import com.worldstar.cut.features.video_editor.domain.model.Project
 import com.worldstar.cut.features.video_editor.domain.usecase.CreateProjectUseCase
 import com.worldstar.cut.features.video_editor.domain.usecase.DeleteProjectUseCase
@@ -15,6 +17,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -24,7 +27,9 @@ class HomeViewModel @Inject constructor(
     private val getAllProjectsUseCase: GetAllProjectsUseCase,
     private val createProjectUseCase: CreateProjectUseCase,
     private val deleteProjectUseCase: DeleteProjectUseCase,
-    private val updateProjectUseCase: UpdateProjectUseCase
+    private val updateProjectUseCase: UpdateProjectUseCase,
+    private val trackDao: TrackDao,
+    private val clipDao: ClipDao
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -87,6 +92,27 @@ class HomeViewModel @Inject constructor(
                                 errorMessage = null
                             )
                         }
+                        // Load thumbnails (first frame of video / image)
+                        viewModelScope.launch {
+                            val thumbs = mutableMapOf<Long, String>()
+                            result.data.forEach { project ->
+                                try {
+                                    val thumb = project.thumbnailPath?.takeIf { it.isNotBlank() }
+                                    if (thumb != null) {
+                                        thumbs[project.id] = thumb
+                                    } else {
+                                        val tracks = trackDao.getTracksListForProject(project.id)
+                                        val videoTrack = tracks.firstOrNull { it.type == "video" } ?: tracks.firstOrNull()
+                                        if (videoTrack != null) {
+                                            val clips = clipDao.getClipsListForTrack(videoTrack.id)
+                                            val firstClip = clips.firstOrNull()
+                                            if (firstClip != null) thumbs[project.id] = firstClip.mediaUri
+                                        }
+                                    }
+                                } catch (_: Exception) {}
+                            }
+                            _uiState.update { it.copy(thumbnails = thumbs) }
+                        }
                     }
                     is Result.Error -> {
                         _uiState.update {
@@ -108,6 +134,7 @@ class HomeViewModel @Inject constructor(
 data class HomeUiState(
     val isLoading: Boolean = true,
     val projects: List<Project> = emptyList(),
+    val thumbnails: Map<Long, String> = emptyMap(),
     val errorMessage: String? = null,
     val contextMenuProject: Project? = null,
     val showDeleteDialog: Project? = null
