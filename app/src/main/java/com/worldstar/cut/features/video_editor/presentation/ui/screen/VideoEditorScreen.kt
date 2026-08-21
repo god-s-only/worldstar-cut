@@ -182,10 +182,12 @@ fun VideoEditorScreen(
                     isImage = uiState.videoClips.firstOrNull()?.isImage == true,
                     isPlaying = uiState.isPlaying,
                     progress = uiState.playbackProgress,
-                    effectType = uiState.selectedClip?.effectType,
-                    motionEffect = uiState.selectedClip?.motionEffect,
-                    motionSegmentsJson = uiState.selectedClip?.motionSegments,
-                    cropX = uiState.selectedClip?.cropX ?: 0f,
+                effectType = uiState.selectedClip?.effectType,
+                motionEffect = uiState.selectedClip?.motionEffect,
+                motionSegmentsJson = uiState.selectedClip?.motionSegments,
+                backgroundEffect = uiState.selectedClip?.backgroundEffect,
+                backgroundEffectValue = uiState.selectedClip?.backgroundEffectValue,
+                cropX = uiState.selectedClip?.cropX ?: 0f,
                     cropY = uiState.selectedClip?.cropY ?: 0f,
                     cropW = uiState.selectedClip?.cropW ?: 1f,
                     cropH = uiState.selectedClip?.cropH ?: 1f,
@@ -233,6 +235,7 @@ fun VideoEditorScreen(
                         onSpeedChanged = viewModel::onClipSpeedChanged,
                         onEffectChanged = viewModel::onClipEffectChanged,
                         onMotionEffectChanged = viewModel::onClipMotionEffectChanged,
+                        onBackgroundEffectChanged = viewModel::onBackgroundEffectChanged,
                         onMotionSegmentAdd = viewModel::onMotionSegmentAdd,
                         onMotionSegmentUpdate = viewModel::onMotionSegmentUpdate,
                         onMotionSegmentDelete = viewModel::onMotionSegmentDelete,
@@ -372,6 +375,8 @@ private fun VideoPreview(
     effectType: String? = null,
     motionEffect: String? = null,
     motionSegmentsJson: String? = null,
+    backgroundEffect: String? = null,
+    backgroundEffectValue: String? = null,
     cropX: Float = 0f,
     cropY: Float = 0f,
     cropW: Float = 1f,
@@ -442,7 +447,22 @@ private fun VideoPreview(
                     "parallax" -> { translationX = kotlin.math.sin(p * Math.PI * 2).toFloat() * 28f; scaleX = 1f + 0.08f * kotlin.math.sin(p * Math.PI * 2).toFloat(); scaleY = 1f + 0.08f * kotlin.math.sin(p * Math.PI * 2).toFloat() }
                 }
             }
-            val mediaModifier = cropModifier.then(motionModifier)
+            var mediaModifier = cropModifier.then(motionModifier)
+            if (backgroundEffect == "blur") {
+                mediaModifier = mediaModifier.then(Modifier.blur(16.dp))
+            }
+
+            // Color BG behind media if selected
+            if (backgroundEffect == "color" && backgroundEffectValue != null) {
+                try {
+                    val bgColor = Color(android.graphics.Color.parseColor(backgroundEffectValue))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(bgColor)
+                    )
+                } catch (_: Exception) {}
+            }
 
             if (isImage) {
                 // Static image preview using Coil
@@ -705,6 +725,7 @@ private fun EditorToolsBar(
         ToolItem(EditorTool.Text, Icons.Filled.TextFields, "Text"),
         ToolItem(EditorTool.Captions, Icons.Filled.ClosedCaption, "Captions"),
         ToolItem(EditorTool.Effects, Icons.Filled.AutoFixHigh, "Filter"),
+        ToolItem(EditorTool.BackgroundRemove, Icons.Filled.PersonOff, "BG"),
         ToolItem(EditorTool.MotionEffect, Icons.Filled.Animation, "Motion"),
         ToolItem(EditorTool.Transition, Icons.Filled.SyncAlt, "Trans"),
         ToolItem(EditorTool.Crop, Icons.Filled.Crop, "Crop"),
@@ -734,7 +755,7 @@ private fun EditorToolsBar(
                     EditorTool.Trim, EditorTool.Text, EditorTool.Effects,
                     EditorTool.Speed, EditorTool.Volume, EditorTool.Adjust,
                     EditorTool.Transition, EditorTool.Crop, EditorTool.MotionTrack,
-                    EditorTool.ImageOverlay, EditorTool.MotionEffect, EditorTool.Captions -> hasSelection
+                    EditorTool.ImageOverlay, EditorTool.MotionEffect, EditorTool.Captions, EditorTool.BackgroundRemove -> hasSelection
                     else -> true
                 }
 
@@ -815,6 +836,7 @@ private fun ToolPanel(
     onSpeedChanged: (Float) -> Unit,
     onEffectChanged: (String?) -> Unit,
     onMotionEffectChanged: (String?) -> Unit,
+    onBackgroundEffectChanged: (String?, String?) -> Unit,
     onMotionSegmentAdd: (String, Long, Long) -> Unit,
     onMotionSegmentUpdate: (Long, String, Long, Long) -> Unit,
     onMotionSegmentDelete: (Long) -> Unit,
@@ -895,6 +917,10 @@ private fun ToolPanel(
                 EditorTool.Effects -> EffectsTool(
                     clip = selectedClip,
                     onEffectChanged = onEffectChanged
+                )
+                EditorTool.BackgroundRemove -> BackgroundRemoveTool(
+                    clip = selectedClip,
+                    onBackgroundEffectChanged = onBackgroundEffectChanged
                 )
                 EditorTool.MotionEffect -> MotionEffectTool(
                     clip = selectedClip,
@@ -1583,7 +1609,7 @@ private fun BackgroundRemoveTool(
     val effects = listOf("None" to "none", "Blur" to "blur", "Color" to "color", "Image" to "image")
     val colors = listOf(Color(0xFF00BCD4), Color(0xFF4CAF50), Color(0xFFFFC107), Color(0xFFE91E63), Color.Black, Color.White)
     Column {
-        Text("Background Remove — AI", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
+        Text("Background Remove ï¿½ AI", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
         Spacer(Modifier.height(4.dp))
         Text("ML Kit selfie segmentation + blur/color/image BG", style = MaterialTheme.typography.labelSmall, color = TextDisabledDark)
         Spacer(Modifier.height(12.dp))
@@ -1623,7 +1649,7 @@ private fun BackgroundRemoveTool(
         }
         if (currentEffect == "blur") {
             Spacer(Modifier.height(8.dp))
-            Text("Preview shows blur — export will bake via ML Kit mask", style = MaterialTheme.typography.labelSmall, color = TextDisabledDark)
+            Text("Preview shows blur ï¿½ export will bake via ML Kit mask", style = MaterialTheme.typography.labelSmall, color = TextDisabledDark)
         }
     }
 }
