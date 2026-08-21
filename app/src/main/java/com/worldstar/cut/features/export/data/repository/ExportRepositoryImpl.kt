@@ -121,8 +121,9 @@ class ExportRepositoryImpl @Inject constructor(
         clips: List<com.worldstar.cut.features.video_editor.data.local.db.ClipEntity>,
         outputFile: File,
         settings: ExportSettings
-    ): Boolean = suspendCancellableCoroutine { cont ->
-        try {
+    ): Boolean = withContext(Dispatchers.Main) {
+        suspendCancellableCoroutine { cont ->
+            try {
             val editedItems = clips.filter { it.mediaType == "video" || it.mediaType == "image" }.map { clip ->
                 val clipping = MediaItem.ClippingConfiguration.Builder()
                     .setStartPositionMs(clip.trimStartMs)
@@ -196,6 +197,7 @@ class ExportRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             Timber.e(e, "Transformer setup failed")
             if (cont.isActive) cont.resume(false)
+        }
         }
     }
 
