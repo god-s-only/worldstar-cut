@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -18,6 +19,8 @@ from app.schemas.marketplace import (
     ListingPackSummary,
 )
 from app.services import marketplace_service, storage
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/marketplace", tags=["marketplace"])
 
@@ -78,7 +81,20 @@ async def create_listing(
     current_user.is_creator = True
     await db.commit()
     await db.refresh(listing)
+
+    _enqueue_moderation(listing.id)
     return _listing_out(listing, 0)
+
+
+def _enqueue_moderation(listing_id: uuid.UUID) -> None:
+    try:
+        from app.workers.tasks import moderate_listing
+
+        moderate_listing.delay(str(listing_id))
+    except Exception:  # noqa: BLE001 - broker down must not fail the request
+        logger.exception(
+            "Failed to enqueue moderation for listing %s", listing_id
+        )
 
 
 @router.get("/listings", response_model=ListingPage)

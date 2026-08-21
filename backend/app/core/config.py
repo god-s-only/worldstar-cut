@@ -32,6 +32,14 @@ class Settings(BaseSettings):
     OBJECT_STORAGE_BUCKET_PREVIEWS: str = "wsc-previews"
     OBJECT_STORAGE_BUCKET_EXPORTS: str = "wsc-exports"
 
+    # Moderation (OCI Vision; manual review when unavailable)
+    OCI_NAMESPACE: str = ""
+    MODERATION_AUTO_APPROVE_BELOW: float = 0.2
+    MODERATION_REJECT_ABOVE: float = 0.8
+    MODERATION_BLOCKED_LABELS: str = (
+        "explicit,nude,nudity,porn,pornographic,sexual,suggestive"
+    )
+
     # Stripe
     STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""

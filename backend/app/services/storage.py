@@ -78,3 +78,15 @@ def delete_object(key: str, bucket: str | None = None) -> None:
         )
     except Exception:  # noqa: BLE001 - best-effort cleanup
         logger.exception("Failed to delete object key=%s", key)
+
+
+def get_object_bytes(key: str, bucket: str | None = None) -> bytes | None:
+    """Download an object fully; None when storage is unreachable."""
+    try:
+        response = get_object_storage_client().get_object(
+            Bucket=bucket or settings.OBJECT_STORAGE_BUCKET_PACKS, Key=key
+        )
+        return response["Body"].read()
+    except Exception:  # noqa: BLE001
+        logger.exception("Failed to read object key=%s", key)
+        return None

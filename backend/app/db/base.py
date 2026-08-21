@@ -20,3 +20,4 @@ Base.metadata.naming_convention = NAMING_CONVENTION
 import app.models.user  # noqa: E402,F401
 import app.models.pack  # noqa: E402,F401
 import app.models.marketplace  # noqa: E402,F401
+import app.models.moderation  # noqa: E402,F401
