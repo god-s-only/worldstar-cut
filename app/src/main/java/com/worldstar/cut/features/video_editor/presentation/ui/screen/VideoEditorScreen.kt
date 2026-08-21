@@ -281,11 +281,12 @@ fun VideoEditorScreen(
                     onAddMedia = viewModel::onAddMediaClicked,
                     selectedClip = uiState.selectedClip,
                     selectedTextOverlayId = uiState.selectedTextOverlayId,
-                    onTextOverlaySelected = viewModel::onTextOverlaySelected,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp)
-                )
+                onTextOverlaySelected = viewModel::onTextOverlaySelected,
+                onMotionSegmentUpdate = viewModel::onMotionSegmentUpdate,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp)
+            )
             }
 
             // Bottom Toolbar — SaaS pill dock, floating
@@ -2597,6 +2598,7 @@ private fun Timeline(
     selectedClip: Clip? = null,
     selectedTextOverlayId: Long? = null,
     onTextOverlaySelected: (Long) -> Unit = {},
+    onMotionSegmentUpdate: (Long, String, Long, Long) -> Unit = { _, _, _, _ -> },
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -2948,6 +2950,15 @@ private fun Timeline(
                                         .clip(RoundedCornerShape(4.dp))
                                         .background(Color(0xFF6A1B9A).copy(alpha = 0.7f))
                                         .border(1.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                                        .pointerInput(seg.id, zoomLevel) {
+                                            detectHorizontalDragGestures { _, dragAmount ->
+                                                val deltaMs = (dragAmount / (36f * zoomLevel) * 200).toLong()
+                                                val clipDur = selectedClip?.trimmedDurationMs?.takeIf { it > 0 } ?: selectedClip?.durationMs?.takeIf { it > 0 } ?: 5000L
+                                                val maxStart = (clipDur - seg.durationMs).coerceAtLeast(0L)
+                                                val newStart = (seg.startMs + deltaMs).coerceIn(0L, maxStart)
+                                                onMotionSegmentUpdate(seg.id, seg.effect, newStart, seg.durationMs)
+                                            }
+                                        }
                                         .padding(horizontal = 4.dp),
                                     contentAlignment = Alignment.CenterStart
                                 ) {
