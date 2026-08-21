@@ -20,6 +20,7 @@ timber = "5.0.1"
 splashscreen = "1.0.1"
 lottie = "6.6.0"
 ffmpeg = "8.1.7"
+segmentationSelfie = "16.0.0-beta6"
 billingKtx = "7.1.1"
 junit = "4.13.2"
 junitExt = "1.2.1"
@@ -90,6 +91,9 @@ timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "tim
 
 # Lottie animations
 lottie-compose = { group = "com.airbnb.android", name = "lottie-compose", version.ref = "lottie" }
+
+# ML Kit Segmentation
+segmentation-selfie = { group = "com.google.mlkit", name = "segmentation-selfie", version.ref = "segmentationSelfie" }
 
 # FFmpeg (video processing)
 ffmpeg-kit-full = { group = "dev.ffmpegkit-maintained", name = "ffmpeg-kit-full", version.ref = "ffmpeg" }

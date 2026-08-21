@@ -150,6 +150,7 @@ dependencies {
     implementation(libs.gson)
     implementation(libs.timber)
     implementation(libs.lottie.compose)
+    implementation(libs.segmentation.selfie)
 
     // FFmpeg
     implementation(libs.ffmpeg.kit.full)
