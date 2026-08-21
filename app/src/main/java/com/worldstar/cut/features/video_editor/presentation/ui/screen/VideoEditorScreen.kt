@@ -2809,13 +2809,22 @@ private fun Timeline(
                                         .background(if (isSelected) WorldstarCyan else WorldstarPurpleLight.copy(alpha = 0.6f))
                                         .border(if (isSelected) 1.dp else 0.dp, Color.White, RoundedCornerShape(4.dp))
                                         .pointerInput(overlay.id, zoomLevel) {
-                                            detectHorizontalDragGestures { _, dragAmount ->
-                                                val deltaMs = (dragAmount / (36f * zoomLevel) * 200).toLong()
-                                                val clipDur = selectedClip?.trimmedDurationMs?.takeIf { it > 0 } ?: selectedClip?.durationMs?.takeIf { it > 0 } ?: 5000L
-                                                val maxStart = (clipDur - overlay.durationMs).coerceAtLeast(0L)
-                                                val newStart = (overlay.startMs + deltaMs).coerceIn(0L, maxStart)
-                                                onTextOverlayTimingUpdate(overlay.id, newStart, overlay.durationMs)
-                                            }
+                                            var totalDrag = 0f
+                                            var initialStart = overlay.startMs
+                                            detectHorizontalDragGestures(
+                                                onDragStart = {
+                                                    totalDrag = 0f
+                                                    initialStart = overlay.startMs
+                                                },
+                                                onHorizontalDrag = { _, dragAmount ->
+                                                    totalDrag += dragAmount
+                                                    val deltaMs = (totalDrag / (36f * zoomLevel) * 200).toLong()
+                                                    val clipDur = selectedClip?.trimmedDurationMs?.takeIf { it > 0 } ?: selectedClip?.durationMs?.takeIf { it > 0 } ?: 5000L
+                                                    val maxStart = (clipDur - overlay.durationMs).coerceAtLeast(0L)
+                                                    val newStart = (initialStart + deltaMs).coerceIn(0L, maxStart)
+                                                    onTextOverlayTimingUpdate(overlay.id, newStart, overlay.durationMs)
+                                                }
+                                            )
                                         }
                                         .clickable { onTextOverlaySelected(overlay.id) }
                                         .padding(horizontal = 4.dp),
@@ -2876,13 +2885,22 @@ private fun Timeline(
                                         .background(if (isSelected) WorldstarCyan else Color(0xFFFF9800).copy(alpha = 0.7f))
                                         .border(if (isSelected) 1.dp else 0.dp, Color.White, RoundedCornerShape(4.dp))
                                         .pointerInput(overlay.id, zoomLevel) {
-                                            detectHorizontalDragGestures { _, dragAmount ->
-                                                val deltaMs = (dragAmount / (36f * zoomLevel) * 200).toLong()
-                                                val clipDur = selectedClip?.trimmedDurationMs?.takeIf { it > 0 } ?: selectedClip?.durationMs?.takeIf { it > 0 } ?: 5000L
-                                                val maxStart = (clipDur - overlay.durationMs).coerceAtLeast(0L)
-                                                val newStart = (overlay.startMs + deltaMs).coerceIn(0L, maxStart)
-                                                onImageOverlayTimingUpdate(overlay.id, newStart, overlay.durationMs)
-                                            }
+                                            var totalDrag = 0f
+                                            var initialStart = overlay.startMs
+                                            detectHorizontalDragGestures(
+                                                onDragStart = {
+                                                    totalDrag = 0f
+                                                    initialStart = overlay.startMs
+                                                },
+                                                onHorizontalDrag = { _, dragAmount ->
+                                                    totalDrag += dragAmount
+                                                    val deltaMs = (totalDrag / (36f * zoomLevel) * 200).toLong()
+                                                    val clipDur = selectedClip?.trimmedDurationMs?.takeIf { it > 0 } ?: selectedClip?.durationMs?.takeIf { it > 0 } ?: 5000L
+                                                    val maxStart = (clipDur - overlay.durationMs).coerceAtLeast(0L)
+                                                    val newStart = (initialStart + deltaMs).coerceIn(0L, maxStart)
+                                                    onImageOverlayTimingUpdate(overlay.id, newStart, overlay.durationMs)
+                                                }
+                                            )
                                         }
                                         .clickable { onTextOverlaySelected(overlay.id) }
                                         .padding(horizontal = 4.dp),
@@ -3011,13 +3029,22 @@ private fun Timeline(
                                         .background(Color(0xFF6A1B9A).copy(alpha = 0.7f))
                                         .border(1.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
                                         .pointerInput(seg.id, zoomLevel) {
-                                            detectHorizontalDragGestures { _, dragAmount ->
-                                                val deltaMs = (dragAmount / (36f * zoomLevel) * 200).toLong()
-                                                val clipDur = selectedClip?.trimmedDurationMs?.takeIf { it > 0 } ?: selectedClip?.durationMs?.takeIf { it > 0 } ?: 5000L
-                                                val maxStart = (clipDur - seg.durationMs).coerceAtLeast(0L)
-                                                val newStart = (seg.startMs + deltaMs).coerceIn(0L, maxStart)
-                                                onMotionSegmentUpdate(seg.id, seg.effect, newStart, seg.durationMs)
-                                            }
+                                            var totalDrag = 0f
+                                            var initialStart = seg.startMs
+                                            detectHorizontalDragGestures(
+                                                onDragStart = {
+                                                    totalDrag = 0f
+                                                    initialStart = seg.startMs
+                                                },
+                                                onHorizontalDrag = { _, dragAmount ->
+                                                    totalDrag += dragAmount
+                                                    val deltaMs = (totalDrag / (36f * zoomLevel) * 200).toLong()
+                                                    val clipDur = selectedClip?.trimmedDurationMs?.takeIf { it > 0 } ?: selectedClip?.durationMs?.takeIf { it > 0 } ?: 5000L
+                                                    val maxStart = (clipDur - seg.durationMs).coerceAtLeast(0L)
+                                                    val newStart = (initialStart + deltaMs).coerceIn(0L, maxStart)
+                                                    onMotionSegmentUpdate(seg.id, seg.effect, newStart, seg.durationMs)
+                                                }
+                                            )
                                         }
                                         .padding(horizontal = 4.dp),
                                     contentAlignment = Alignment.CenterStart
