@@ -118,7 +118,7 @@ class ExportRepositoryImpl @Inject constructor(
     }
 
     private suspend fun exportVideoWithTransformer(
-        clips: List<com.worldstar.cut.features.video_editor.domain.model.Clip>,
+        clips: List<com.worldstar.cut.features.video_editor.data.local.db.ClipEntity>,
         outputFile: File,
         settings: ExportSettings
     ): Boolean = suspendCancellableCoroutine { cont ->
