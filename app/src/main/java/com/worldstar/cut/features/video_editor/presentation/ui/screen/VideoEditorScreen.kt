@@ -237,21 +237,23 @@ fun VideoEditorScreen(
                         onMotionSegmentDelete = viewModel::onMotionSegmentDelete,
                         onTransitionChanged = viewModel::onClipTransitionChanged,
                         onCropChanged = viewModel::onClipCropChanged,
-                        onOverlayAdd = viewModel::onTextOverlayAdd,
-                        selectedOverlayId = uiState.selectedTextOverlayId,
-                        onOverlayUpdate = viewModel::onTextOverlayUpdate,
-                        onAnimationChanged = viewModel::onTextOverlayAnimationChanged,
-                        onTimingChanged = viewModel::onTextOverlayTimingChanged,
-                        onDeleteOverlay = viewModel::onTextOverlayDelete,
+                    onOverlayAdd = viewModel::onTextOverlayAdd,
+                    selectedOverlayId = uiState.selectedTextOverlayId,
+                    onOverlayUpdate = viewModel::onTextOverlayUpdate,
+                    onAnimationChanged = viewModel::onTextOverlayAnimationChanged,
+                    onExitAnimationChanged = viewModel::onTextOverlayExitAnimationChanged,
+                    onTimingChanged = viewModel::onTextOverlayTimingChanged,
+                    onDeleteOverlay = viewModel::onTextOverlayDelete,
                         isTracking = uiState.isTracking,
                         trackProgress = uiState.trackProgress,
                         onStartTracking = viewModel::onStartMotionTracking,
                         onCancelTracking = viewModel::onCancelMotionTracking,
-                        onImageOverlayAdd = viewModel::onImageOverlayAdd,
-                        onImageOverlayUpdate = viewModel::onImageOverlayTransformChanged,
-                        onImageOverlayDelete = viewModel::onImageOverlayDelete,
-                        onImageOverlayAnimationChanged = viewModel::onImageOverlayAnimationChanged,
-                        onImageOverlayTimingChanged = viewModel::onImageOverlayTimingChanged,
+                    onImageOverlayAdd = viewModel::onImageOverlayAdd,
+                    onImageOverlayUpdate = viewModel::onImageOverlayTransformChanged,
+                    onImageOverlayDelete = viewModel::onImageOverlayDelete,
+                    onImageOverlayAnimationChanged = viewModel::onImageOverlayAnimationChanged,
+                    onImageOverlayExitAnimationChanged = viewModel::onImageOverlayExitAnimationChanged,
+                    onImageOverlayTimingChanged = viewModel::onImageOverlayTimingChanged,
                         onPickImage = { imageOverlayPickerLauncher.launch("image/*") },
                         onDelete = viewModel::onDeleteClip
                     )
@@ -816,6 +818,7 @@ private fun ToolPanel(
     selectedOverlayId: Long?,
     onOverlayUpdate: (Long, String, Int, String) -> Unit,
     onAnimationChanged: (Long, String) -> Unit,
+    onExitAnimationChanged: (Long, String) -> Unit,
     onTimingChanged: (Long, Long, Long) -> Unit,
     onDeleteOverlay: (Long) -> Unit,
     isTracking: Boolean,
@@ -826,6 +829,7 @@ private fun ToolPanel(
     onImageOverlayUpdate: (Long, Float, Float, Float, Float) -> Unit,
     onImageOverlayDelete: (Long) -> Unit,
     onImageOverlayAnimationChanged: (Long, String) -> Unit,
+    onImageOverlayExitAnimationChanged: (Long, String) -> Unit,
     onImageOverlayTimingChanged: (Long, Long, Long) -> Unit,
     onPickImage: () -> Unit,
     onDelete: () -> Unit
@@ -876,6 +880,7 @@ private fun ToolPanel(
                     overlaysJson = selectedClip?.textOverlays,
                     onOverlayUpdate = onOverlayUpdate,
                     onAnimationChanged = onAnimationChanged,
+                    onExitAnimationChanged = onExitAnimationChanged,
                     onTimingChanged = onTimingChanged,
                     onDeleteOverlay = onDeleteOverlay
                 )
@@ -913,6 +918,7 @@ private fun ToolPanel(
                     onPickImage = onPickImage,
                     onDelete = onImageOverlayDelete,
                     onAnimationChanged = onImageOverlayAnimationChanged,
+                    onExitAnimationChanged = onImageOverlayExitAnimationChanged,
                     onTimingChanged = onImageOverlayTimingChanged
                 )
                 EditorTool.Speed -> SpeedTool(
@@ -2332,6 +2338,7 @@ private fun ImageOverlayTool(
     onPickImage: () -> Unit,
     onDelete: (Long) -> Unit = {},
     onAnimationChanged: (Long, String) -> Unit = { _, _ -> },
+    onExitAnimationChanged: (Long, String) -> Unit = { _, _ -> },
     onTimingChanged: (Long, Long, Long) -> Unit = { _, _, _ -> }
 ) {
     val overlays = remember(clip?.imageOverlays) {
@@ -2413,6 +2420,26 @@ private fun ImageOverlayTool(
                         label = { Text(label, style = MaterialTheme.typography.labelSmall) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = WorldstarCyan,
+                            selectedLabelColor = Color.White,
+                            containerColor = SurfaceDark,
+                            labelColor = TextSecondaryDark
+                        )
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+            Text("Exit Animation", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
+            Spacer(Modifier.height(8.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(stickerAnimOptions) { (label, key) ->
+                    val isSelected = selectedOverlay.animationOut == key
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { onExitAnimationChanged(selectedOverlay.id, key) },
+                        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = WorldstarPink,
                             selectedLabelColor = Color.White,
                             containerColor = SurfaceDark,
                             labelColor = TextSecondaryDark
