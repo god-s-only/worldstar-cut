@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
+from app.api.v1.admin.moderation import router as admin_moderation_router
+from app.api.v1.admin.payouts import router as admin_payouts_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.health import router as health_router
 from app.api.v1.marketplace import router as marketplace_router
@@ -29,6 +31,8 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(packs_router, prefix="/api/v1")
 app.include_router(marketplace_router, prefix="/api/v1")
 app.include_router(stripe_webhook_router)
+app.include_router(admin_moderation_router, prefix="/api/v1")
+app.include_router(admin_payouts_router, prefix="/api/v1")
 
 
 @app.get("/", tags=["root"])

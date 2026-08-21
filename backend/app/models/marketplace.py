@@ -94,3 +94,31 @@ class Entitlement(Base):
 
     def __repr__(self) -> str:
         return f"<Entitlement buyer={self.buyer_id} pack={self.pack_id}>"
+
+
+class Payout(Base):
+    __tablename__ = "payouts"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    seller_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    currency: Mapped[str] = mapped_column(
+        String(8), nullable=False, default="usd", server_default="usd"
+    )
+    stripe_transfer_id: Mapped[str | None] = mapped_column(
+        Text, unique=True, nullable=True
+    )
+    # pending / completed / failed
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="pending", server_default="pending"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    def __repr__(self) -> str:
+        return f"<Payout id={self.id} amount={self.amount_cents} status={self.status!r}>"

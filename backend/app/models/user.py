@@ -27,6 +27,9 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )
+    is_admin: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     stripe_account_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     kyc_status: Mapped[str] = mapped_column(
         String(32), nullable=False, default="unverified", server_default="unverified"
