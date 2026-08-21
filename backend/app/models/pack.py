@@ -1,9 +1,11 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
     Column,
+    Computed,
     DateTime,
     ForeignKey,
     Integer,
@@ -12,7 +14,7 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -58,6 +60,14 @@ class Pack(Base):
         nullable=False,
         server_default=func.now(),
         onupdate=func.now(),
+    )
+    # Full-text search over title + description (plan §8); tags searched via join.
+    search_vector: Mapped[Any] = mapped_column(
+        TSVECTOR,
+        Computed(
+            "to_tsvector('english', coalesce(title, '') || ' ' || coalesce(description, ''))",
+            persisted=True,
+        ),
     )
 
     items: Mapped[list["PackItem"]] = relationship(

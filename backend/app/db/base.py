@@ -19,3 +19,4 @@ Base.metadata.naming_convention = NAMING_CONVENTION
 # Plain imports (no attribute access) keep partial-init circulars safe.
 import app.models.user  # noqa: E402,F401
 import app.models.pack  # noqa: E402,F401
+import app.models.marketplace  # noqa: E402,F401
