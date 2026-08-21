@@ -254,9 +254,10 @@ fun VideoEditorScreen(
                     onImageOverlayAnimationChanged = viewModel::onImageOverlayAnimationChanged,
                     onImageOverlayExitAnimationChanged = viewModel::onImageOverlayExitAnimationChanged,
                     onImageOverlayTimingChanged = viewModel::onImageOverlayTimingChanged,
-                        onPickImage = { imageOverlayPickerLauncher.launch("image/*") },
-                        onDelete = viewModel::onDeleteClip
-                    )
+                    onPickImage = { imageOverlayPickerLauncher.launch("image/*") },
+                    onDelete = viewModel::onDeleteClip,
+                    onGenerateCaptions = viewModel::onGenerateCaptions
+                )
                 }
             }
 
@@ -701,6 +702,7 @@ private fun EditorToolsBar(
     val tools = listOf(
         ToolItem(EditorTool.Trim, Icons.Filled.ContentCut, "Trim"),
         ToolItem(EditorTool.Text, Icons.Filled.TextFields, "Text"),
+        ToolItem(EditorTool.Captions, Icons.Filled.ClosedCaption, "Captions"),
         ToolItem(EditorTool.Effects, Icons.Filled.AutoFixHigh, "Filter"),
         ToolItem(EditorTool.MotionEffect, Icons.Filled.Animation, "Motion"),
         ToolItem(EditorTool.Transition, Icons.Filled.SyncAlt, "Trans"),
@@ -731,7 +733,7 @@ private fun EditorToolsBar(
                     EditorTool.Trim, EditorTool.Text, EditorTool.Effects,
                     EditorTool.Speed, EditorTool.Volume, EditorTool.Adjust,
                     EditorTool.Transition, EditorTool.Crop, EditorTool.MotionTrack,
-                    EditorTool.ImageOverlay, EditorTool.MotionEffect -> hasSelection
+                    EditorTool.ImageOverlay, EditorTool.MotionEffect, EditorTool.Captions -> hasSelection
                     else -> true
                 }
 
@@ -835,7 +837,8 @@ private fun ToolPanel(
     onImageOverlayExitAnimationChanged: (Long, String) -> Unit,
     onImageOverlayTimingChanged: (Long, Long, Long) -> Unit,
     onPickImage: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onGenerateCaptions: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -887,6 +890,7 @@ private fun ToolPanel(
                     onTimingChanged = onTimingChanged,
                     onDeleteOverlay = onDeleteOverlay
                 )
+                EditorTool.Captions -> CaptionsTool(onGenerate = onGenerateCaptions)
                 EditorTool.Effects -> EffectsTool(
                     clip = selectedClip,
                     onEffectChanged = onEffectChanged
@@ -1532,6 +1536,40 @@ private fun MotionEffectTool(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CaptionsTool(
+    onGenerate: () -> Unit
+) {
+    Column {
+        Text("Auto Captions — AI", style = MaterialTheme.typography.titleSmall, color = TextPrimaryDark)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Generates timed captions from audio. Demo uses placeholder text — wire to Whisper/STT for real transcription.",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextDisabledDark
+        )
+        Spacer(Modifier.height(12.dp))
+        Button(
+            onClick = onGenerate,
+            colors = ButtonDefaults.buttonColors(containerColor = WorldstarCyan),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(Icons.Default.ClosedCaption, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Generate Captions", fontWeight = FontWeight.SemiBold, color = Color.White)
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Creates 2.5s chunks from current playhead. Edit text/timing in Text tool afterwards.",
+            style = MaterialTheme.typography.labelSmall,
+            color = TextDisabledDark
+        )
     }
 }
 
