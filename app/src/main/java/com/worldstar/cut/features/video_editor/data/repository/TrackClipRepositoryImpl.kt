@@ -182,7 +182,9 @@ class TrackClipRepositoryImpl @Inject constructor(
         imageOverlays = imageOverlays,
         motionEffect = motionEffect,
         volumeKeyframes = volumeKeyframes,
-        motionSegments = motionSegments
+        motionSegments = motionSegments,
+        backgroundEffect = backgroundEffect,
+        backgroundEffectValue = backgroundEffectValue
     )
 
     private fun Clip.toEntity() = ClipEntity(
@@ -220,6 +222,8 @@ class TrackClipRepositoryImpl @Inject constructor(
         imageOverlays = imageOverlays,
         motionEffect = motionEffect,
         volumeKeyframes = volumeKeyframes,
-        motionSegments = motionSegments
+        motionSegments = motionSegments,
+        backgroundEffect = backgroundEffect,
+        backgroundEffectValue = backgroundEffectValue
     )
 }
