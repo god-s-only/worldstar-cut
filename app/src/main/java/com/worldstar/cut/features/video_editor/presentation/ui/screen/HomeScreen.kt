@@ -31,7 +31,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import coil.video.videoFrameMillis
 import com.worldstar.cut.core.ui.theme.*
 import com.worldstar.cut.features.video_editor.domain.model.Project
 import com.worldstar.cut.features.video_editor.presentation.viewmodel.HomeEvent
@@ -349,11 +348,9 @@ private fun ProjectCard(
             ) {
                 // Thumbnail — first frame of video or image
                 if (thumbnailUri != null) {
-                    val isVideo = thumbnailUri.contains(".mp4", true) || thumbnailUri.contains("video", true)
                     AsyncImage(
                         model = ImageRequest.Builder(context)
                             .data(thumbnailUri)
-                            .apply { if (isVideo) videoFrameMillis(500) }
                             .crossfade(true)
                             .build(),
                         contentDescription = null,
