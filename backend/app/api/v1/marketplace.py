@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.deps import get_current_user
 from app.db.session import get_db
-from app.models.marketplace import Listing
+from app.models.marketplace import Entitlement, Listing, Purchase
 from app.models.pack import Pack
 from app.models.user import User
 from app.schemas.marketplace import (
@@ -149,3 +149,137 @@ async def get_listing(
         **base.model_dump(),
         preview_urls=[p for p in previews if p],
     )
+
+
+@router.post("/listings/{listing_id}/purchase")
+async def purchase_listing(
+    listing_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    from app.services import stripe_service
+
+    listing = await db.get(Listing, listing_id)
+    if listing is None or listing.status != "approved":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Listing not found")
+    if listing.seller_id == current_user.id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "You cannot buy your own pack")
+
+    already = await db.get(Entitlement, (current_user.id, listing.pack_id))
+    if already is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "You already own this pack")
+
+    # Free packs are granted instantly, no Stripe round-trip.
+    if listing.price_cents == 0:
+        db.add(Entitlement(buyer_id=current_user.id, pack_id=listing.pack_id))
+        db.add(
+            Purchase(
+                buyer_id=current_user.id,
+                listing_id=listing.id,
+                amount_cents=0,
+                fee_cents=0,
+                status="completed",
+            )
+        )
+        listing.downloads += 1
+        await db.commit()
+        return {"free": True, "checkout_url": None}
+
+    session_id, checkout_url = stripe_service.create_checkout_session(
+        listing, current_user
+    )
+    db.add(
+        Purchase(
+            buyer_id=current_user.id,
+            listing_id=listing.id,
+            stripe_checkout_id=session_id,
+            amount_cents=listing.price_cents,
+            fee_cents=stripe_service.compute_fee(listing.price_cents),
+            status="pending",
+        )
+    )
+    await db.commit()
+    return {"free": False, "checkout_url": checkout_url}
+
+
+@router.get("/entitlements/me")
+async def my_entitlements(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[dict]:
+    rows = (
+        (
+            await db.scalars(
+                select(Entitlement)
+                .options(selectinload(Entitlement.pack).selectinload(Pack.items))
+                .where(Entitlement.buyer_id == current_user.id)
+                .order_by(Entitlement.created_at.desc())
+            )
+        )
+        .unique()
+        .all()
+    )
+    return [
+        {
+            "pack_id": e.pack_id,
+            "title": e.pack.title,
+            "cover_url": (
+                storage.presigned_get(e.pack.cover_url) if e.pack.cover_url else None
+            ),
+            "items": [
+                {
+                    "id": i.id,
+                    "type": i.type,
+                    "file_url": storage.presigned_get(i.file_url),
+                    "width": i.width,
+                    "height": i.height,
+                    "duration_ms": i.duration_ms,
+                    "position": i.position,
+                }
+                for i in e.pack.items
+            ],
+        }
+        for e in rows
+    ]
+
+
+@router.get("/packs/{pack_id}/download")
+async def download_pack(
+    pack_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Presigned manifest for an owned (or free) pack — mobile unzips/downloads."""
+    pack = await db.scalar(
+        select(Pack)
+        .options(selectinload(Pack.items))
+        .where(Pack.id == pack_id)
+    )
+    if pack is None or not pack.is_public:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Pack not found")
+    if pack.owner_id != current_user.id:
+        listing = await db.scalar(select(Listing).where(Listing.pack_id == pack_id))
+        free_or_owned = (listing is not None and listing.price_cents == 0) or (
+            await db.get(Entitlement, (current_user.id, pack_id)) is not None
+        )
+        if not free_or_owned:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN, "You do not own this pack"
+            )
+
+    return {
+        "pack_id": pack.id,
+        "title": pack.title,
+        "items": [
+            {
+                "id": i.id,
+                "type": i.type,
+                "file_url": storage.presigned_get(i.file_url),
+                "preview_url": (
+                    storage.presigned_get(i.preview_url) if i.preview_url else None
+                ),
+                "position": i.position,
+            }
+            for i in pack.items
+        ],
+    }

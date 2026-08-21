@@ -6,6 +6,7 @@ from app.api.v1.auth import router as auth_router
 from app.api.v1.health import router as health_router
 from app.api.v1.marketplace import router as marketplace_router
 from app.api.v1.packs import router as packs_router
+from app.api.v1.webhooks.stripe import router as stripe_webhook_router
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -27,6 +28,7 @@ app.include_router(health_router, prefix="/api/v1", tags=["health"])
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(packs_router, prefix="/api/v1")
 app.include_router(marketplace_router, prefix="/api/v1")
+app.include_router(stripe_webhook_router)
 
 
 @app.get("/", tags=["root"])

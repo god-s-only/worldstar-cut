@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
     STRIPE_PUBLISHABLE_KEY: str = ""
+    STRIPE_PLATFORM_FEE_PERCENT: float = 10.0
+
+    # Public base URL used for Stripe redirects
+    APP_BASE_URL: str = "http://localhost:8000"
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
 

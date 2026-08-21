@@ -59,3 +59,21 @@ async def login(
 @router.get("/me", response_model=UserOut)
 async def me(current_user: User = Depends(get_current_user)) -> User:
     return current_user
+
+
+@router.post("/connect/onboard")
+async def connect_onboard(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Stripe Connect Express onboarding link for sellers (plan §3)."""
+    from app.services import stripe_service
+
+    current_user.is_creator = True
+    if not current_user.stripe_account_id:
+        current_user.stripe_account_id = stripe_service.create_connect_account(
+            current_user
+        )
+        await db.commit()
+    url = stripe_service.create_onboarding_link(current_user.stripe_account_id)
+    return {"onboarding_url": url}
