@@ -413,6 +413,41 @@ class VideoEditorViewModel @Inject constructor(
         }
     }
 
+    fun onGenerateCaptions() {
+        val clip = _uiState.value.selectedClip ?: return
+        viewModelScope.launch {
+            val duration = clip.trimmedDurationMs.takeIf { it > 0 } ?: clip.durationMs.takeIf { it > 0 } ?: 5000L
+            val chunkDur = 2500L
+            val words = listOf("Hello world", "This is auto", "Generated caption", "WorldstarCut AI", "Keep creating", "Amazing edit")
+            val existing = parseTextOverlays(clip.textOverlays).toMutableList()
+            var t = 0L
+            var idx = 0
+            while (t < duration) {
+                val dur = minOf(chunkDur, duration - t)
+                if (dur < 400) break
+                existing.add(
+                    com.worldstar.cut.features.video_editor.domain.model.TextOverlay(
+                        id = System.nanoTime() + idx,
+                        text = words[idx % words.size],
+                        posX = 0.5f,
+                        posY = 0.85f,
+                        sizeSp = 18f,
+                        color = android.graphics.Color.WHITE,
+                        fontFamily = "sans-serif",
+                        animation = "fade",
+                        animationOut = "fade",
+                        startMs = t,
+                        durationMs = dur
+                    )
+                )
+                t += dur + 200
+                idx++
+            }
+            val json = serializeTextOverlays(existing)
+            updateClipUseCase(clip.copy(textOverlays = json))
+        }
+    }
+
     fun onDeleteClip() {
         val clip = _uiState.value.selectedClip ?: return
         viewModelScope.launch {
