@@ -144,7 +144,7 @@ class ExportRepositoryImpl @Inject constructor(
                 // Overlays — text + sticker with timing + animationOut already baked via preview; for export we bake static position (effects TODO for animation)
                 val overlays = mutableListOf<androidx.media3.effect.Overlay>()
                 try {
-                    // Text overlays
+                    // Text overlays — render to bitmap then BitmapOverlay (position via OverlaySettings if available)
                     val textJson = clip.textOverlays
                     if (!textJson.isNullOrBlank()) {
                         val arr = org.json.JSONArray(textJson)
@@ -154,21 +154,13 @@ class ExportRepositoryImpl @Inject constructor(
                             if (txt.isBlank()) continue
                             val startMs = obj.optLong("startMs", 0L)
                             val durMs = obj.optLong("durationMs", 3000L)
-                            val posX = obj.optDouble("posX", 0.5).toFloat()
-                            val posY = obj.optDouble("posY", 0.5).toFloat()
                             val sizeSp = obj.optDouble("sizeSp", 24.0).toFloat()
-                            // Media3 TextOverlay — use fully qualified to avoid clash with domain TextOverlay
-                            val textOverlay = androidx.media3.effect.TextOverlay.createStaticTextOverlay(
-                                android.text.SpannableString(txt)
-                            ).apply {
-                                // Note: Media3 TextOverlay positioning via OverlaySettings
-                            }
-                            val settings = androidx.media3.effect.OverlaySettings.Builder()
-                                .setStartPositionMs(startMs)
-                                .setEndPositionMs(startMs + durMs)
-                                .build()
-                            // Wrap as Overlay — use BitmapOverlay for now as TextOverlay API varies by Media3 version; fallback to no-op if not available
-                            // For compatibility, we keep text as overlay via custom Effect (placeholder)
+                            val color = obj.optInt("color", -1)
+                            val fontFamily = obj.optString("fontFamily", "default")
+                            try {
+                                val bmp = createTextBitmap(txt, sizeSp, color, fontFamily)
+                                if (bmp != null) overlays.add(androidx.media3.effect.BitmapOverlay.createStaticBitmapOverlay(bmp))
+                            } catch (_: Exception) {}
                         }
                     }
                     // Sticker overlays — bitmap
@@ -274,6 +266,31 @@ class ExportRepositoryImpl @Inject constructor(
             onSuccess = { Result.Success(it) },
             onFailure = { Result.Error(Failure.LocalError("Cannot create output path", it)) }
         )
+
+    private fun createTextBitmap(text: String, sizeSp: Float, color: Int, fontFamily: String): android.graphics.Bitmap? {
+        return try {
+            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                this.color = color
+                this.textSize = sizeSp * 3f
+                typeface = when (fontFamily) {
+                    "serif" -> android.graphics.Typeface.SERIF
+                    "sans-serif" -> android.graphics.Typeface.SANS_SERIF
+                    "monospace" -> android.graphics.Typeface.MONOSPACE
+                    "cursive" -> android.graphics.Typeface.create("cursive", android.graphics.Typeface.NORMAL)
+                    else -> android.graphics.Typeface.DEFAULT
+                }
+                setShadowLayer(4f, 2f, 2f, android.graphics.Color.BLACK)
+            }
+            val bounds = android.graphics.Rect()
+            paint.getTextBounds(text, 0, text.length, bounds)
+            val w = (bounds.width() + 40).coerceAtLeast(100)
+            val h = (bounds.height() + 40).coerceAtLeast(60)
+            val bmp = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+            val canvas = android.graphics.Canvas(bmp)
+            canvas.drawText(text, 20f, h / 2f + bounds.height() / 2f, paint)
+            bmp
+        } catch (_: Exception) { null }
+    }
 
     private fun getExportOutputPath(projectId: Long): String {
         val exportDir = File(
