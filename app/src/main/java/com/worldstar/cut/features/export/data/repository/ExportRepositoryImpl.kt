@@ -142,7 +142,7 @@ class ExportRepositoryImpl @Inject constructor(
                 }
 
                 // Overlays — text + sticker with timing + animationOut already baked via preview; for export we bake static position (effects TODO for animation)
-                val overlays = mutableListOf<androidx.media3.effect.BitmapOverlay>()
+                val overlays = mutableListOf<androidx.media3.effect.TextureOverlay>()
                 try {
                     // Text overlays — render to bitmap then BitmapOverlay (position via OverlaySettings if available)
                     val textJson = clip.textOverlays
