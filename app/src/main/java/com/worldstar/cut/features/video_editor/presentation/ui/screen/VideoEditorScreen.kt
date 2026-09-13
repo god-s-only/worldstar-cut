@@ -454,14 +454,16 @@ private fun VideoPreview(
 
             // Color BG behind media if selected
             if (backgroundEffect == "color" && backgroundEffectValue != null) {
-                try {
-                    val bgColor = Color(android.graphics.Color.parseColor(backgroundEffectValue))
+                val bgColor = remember(backgroundEffectValue) {
+                    try { Color(android.graphics.Color.parseColor(backgroundEffectValue)) } catch (_: Exception) { null }
+                }
+                if (bgColor != null) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(bgColor)
                     )
-                } catch (_: Exception) {}
+                }
             }
 
             if (isImage) {
