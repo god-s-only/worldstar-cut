@@ -122,7 +122,7 @@ class ExportRepositoryImpl @Inject constructor(
         outputFile: File,
         settings: ExportSettings
     ): Boolean = withContext(Dispatchers.Main) {
-        suspendCancellableCoroutine { cont ->
+        suspendCancellableCoroutine<Boolean> { cont ->
             try {
             val editedItems = clips.filter { it.mediaType == "video" || it.mediaType == "image" }.map { clip ->
                 val clipping = MediaItem.ClippingConfiguration.Builder()
@@ -142,7 +142,7 @@ class ExportRepositoryImpl @Inject constructor(
                 }
 
                 // Overlays — text + sticker with timing + animationOut already baked via preview; for export we bake static position (effects TODO for animation)
-                val overlays = mutableListOf<androidx.media3.effect.Overlay>()
+                val overlays = mutableListOf<androidx.media3.effect.BitmapOverlay>()
                 try {
                     // Text overlays — render to bitmap then BitmapOverlay (position via OverlaySettings if available)
                     val textJson = clip.textOverlays
