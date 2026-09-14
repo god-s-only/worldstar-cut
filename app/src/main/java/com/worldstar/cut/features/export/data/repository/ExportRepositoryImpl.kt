@@ -138,7 +138,12 @@ class ExportRepositoryImpl @Inject constructor(
                 val videoEffects = mutableListOf<Effect>()
 
                 if (clip.cropW != 1f || clip.cropH != 1f || clip.cropX != 0f || clip.cropY != 0f) {
-                    videoEffects.add(Crop(clip.cropX - 0.5f, clip.cropY - 0.5f, clip.cropW, clip.cropH))
+                    // Crop(left, right, bottom, top), full frame = (-0.5, 0.5, -0.5, 0.5) per Media3 docs
+                    val left = clip.cropX - 0.5f
+                    val right = clip.cropX + clip.cropW - 0.5f
+                    val bottom = clip.cropY - 0.5f
+                    val top = clip.cropY + clip.cropH - 0.5f
+                    videoEffects.add(Crop(left, right, bottom, top))
                 }
 
                 // Overlays — text + sticker with timing + animationOut already baked via preview; for export we bake static position (effects TODO for animation)
