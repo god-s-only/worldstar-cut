@@ -5,9 +5,15 @@ import android.media.MediaExtractor
 import java.nio.ByteBuffer
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
+import android.media.MediaMuxer
 import android.net.Uri
-import com.arthenica.ffmpegkit.FFmpegKit
-import com.arthenica.ffmpegkit.ReturnCode
+import androidx.media3.common.MediaItem
+import androidx.media3.transformer.Composition
+import androidx.media3.transformer.EditedMediaItem
+import androidx.media3.transformer.EditedMediaItemSequence
+import androidx.media3.transformer.ExportException
+import androidx.media3.transformer.ExportResult
+import androidx.media3.transformer.Transformer
 import com.worldstar.cut.core.domain.result.Failure
 import com.worldstar.cut.core.domain.result.Result
 import com.worldstar.cut.features.trim_cut.domain.model.CutSegment
@@ -52,17 +58,11 @@ class TrimCutRepositoryImpl @Inject constructor(
     }
 
     override suspend fun applyTrim(uri: String, startMs: Long, endMs: Long): Result<String> =
-        withContext(Dispatchers.IO) {
+        withContext(Dispatchers.Main) {
             runCatching {
                 val outputPath = createOutputPath("trim")
-                val durationMs = endMs - startMs
-                val cmd = "-y -ss $startMs -t $durationMs -i \"$uri\" -c copy \"$outputPath\""
-                val session = FFmpegKit.execute(cmd)
-                if (ReturnCode.isSuccess(session.returnCode)) {
-                    outputPath
-                } else {
-                    throw RuntimeException(session.failStackTrace ?: "FFmpeg trim failed")
-                }
+                val ok = exportTrimmedWithTransformer(uri, startMs, endMs, outputPath)
+                if (ok) outputPath else throw RuntimeException("Transformer trim failed")
             }.fold(
                 onSuccess = { Result.Success(it) },
                 onFailure = { e ->
@@ -71,6 +71,48 @@ class TrimCutRepositoryImpl @Inject constructor(
                 }
             )
         }
+
+    private suspend fun exportTrimmedWithTransformer(
+        uri: String,
+        startMs: Long,
+        endMs: Long,
+        outputPath: String
+    ): Boolean = kotlinx.coroutines.suspendCancellableCoroutine<Boolean> { cont ->
+        try {
+            val clipping = MediaItem.ClippingConfiguration.Builder()
+                .setStartPositionMs(startMs.coerceAtLeast(0L))
+                .setEndPositionMs(endMs.coerceAtLeast(startMs + 200))
+                .build()
+            val mediaItem = MediaItem.Builder()
+                .setUri(uri)
+                .setClippingConfiguration(clipping)
+                .build()
+            val edited = EditedMediaItem.Builder(mediaItem).build()
+            val composition = Composition.Builder(EditedMediaItemSequence(edited)).build()
+            // Transformer must run on the application (main) thread
+            val transformer = Transformer.Builder(context)
+                .addListener(object : Transformer.Listener {
+                    override fun onCompleted(composition: Composition, exportResult: ExportResult) {
+                        if (cont.isActive) cont.resume(true)
+                    }
+
+                    override fun onError(
+                        composition: Composition,
+                        exportResult: ExportResult,
+                        exportException: ExportException
+                    ) {
+                        Timber.e(exportException, "Trim transformer error")
+                        if (cont.isActive) cont.resume(false)
+                    }
+                })
+                .build()
+            transformer.start(composition, outputPath)
+            cont.invokeOnCancellation { try { transformer.cancel() } catch (_: Exception) {} }
+        } catch (e: Exception) {
+            Timber.e(e, "Trim transformer setup failed")
+            if (cont.isActive) cont.resume(false)
+        }
+    }
 
     override suspend fun splitAtPosition(uri: String, positionMs: Long): Result<SplitState> =
         withContext(Dispatchers.IO) {
@@ -101,11 +143,9 @@ class TrimCutRepositoryImpl @Inject constructor(
     override suspend fun extractAudio(uri: String): Result<String> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val outputPath = createOutputPath("audio")
-                val cmd = "-y -i \"$uri\" -vn -acodec copy \"$outputPath\""
-                val session = FFmpegKit.execute(cmd)
-                if (ReturnCode.isSuccess(session.returnCode)) outputPath
-                else throw RuntimeException(session.failStackTrace ?: "Audio extraction failed")
+                val outputPath = createOutputPath("audio").replace(".mp4", ".m4a")
+                copyAudioTrack(uri, outputPath)
+                outputPath
             }.fold(
                 onSuccess = { Result.Success(it) },
                 onFailure = { e ->
@@ -114,6 +154,48 @@ class TrimCutRepositoryImpl @Inject constructor(
                 }
             )
         }
+
+    private fun copyAudioTrack(inputUri: String, outputPath: String) {
+        val extractor = MediaExtractor()
+        try {
+            extractor.setDataSource(context, Uri.parse(inputUri), null)
+            var audioTrackIndex = -1
+            var audioFormat: MediaFormat? = null
+            for (i in 0 until extractor.trackCount) {
+                val format = extractor.getTrackFormat(i)
+                val mime = format.getString(MediaFormat.KEY_MIME) ?: continue
+                if (mime.startsWith("audio/")) {
+                    audioTrackIndex = i
+                    audioFormat = format
+                    break
+                }
+            }
+            require(audioTrackIndex >= 0) { "No audio track in $inputUri" }
+            extractor.selectTrack(audioTrackIndex)
+            val muxer = MediaMuxer(outputPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            try {
+                val outTrack = muxer.addTrack(audioFormat!!)
+                muxer.start()
+                val buffer = ByteBuffer.allocate(256 * 1024)
+                val info = android.media.MediaCodec.BufferInfo()
+                while (true) {
+                    val sampleSize = extractor.readSampleData(buffer, 0)
+                    if (sampleSize < 0) break
+                    info.offset = 0
+                    info.size = sampleSize
+                    info.presentationTimeUs = extractor.sampleTime
+                    info.flags = extractor.sampleFlags
+                    muxer.writeSampleData(outTrack, buffer, info)
+                    extractor.advance()
+                }
+                muxer.stop()
+            } finally {
+                try { muxer.release() } catch (_: Exception) {}
+            }
+        } finally {
+            try { extractor.release() } catch (_: Exception) {}
+        }
+    }
 
     override suspend fun getWaveformData(uri: String): Result<List<Float>> =
         withContext(Dispatchers.IO) {
