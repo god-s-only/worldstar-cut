@@ -96,7 +96,7 @@ class TrimCutRepositoryImpl @Inject constructor(
             val transformer = Transformer.Builder(context)
                 .addListener(object : Transformer.Listener {
                     override fun onCompleted(composition: Composition, exportResult: ExportResult) {
-                        if (cont.isActive) cont.resumeWith(Result.success(true))
+                        if (cont.isActive) cont.resumeWith(kotlin.Result.success(true))
                     }
 
                     override fun onError(
@@ -105,7 +105,7 @@ class TrimCutRepositoryImpl @Inject constructor(
                         exportException: ExportException
                     ) {
                         Timber.e(exportException, "Trim transformer error")
-                        if (cont.isActive) cont.resumeWith(Result.success(false))
+                        if (cont.isActive) cont.resumeWith(kotlin.Result.success(false))
                     }
                 })
                 .build()
@@ -113,7 +113,7 @@ class TrimCutRepositoryImpl @Inject constructor(
             cont.invokeOnCancellation { try { transformer.cancel() } catch (_: Exception) {} }
         } catch (e: Exception) {
             Timber.e(e, "Trim transformer setup failed")
-            if (cont.isActive) cont.resumeWith(Result.success(false))
+            if (cont.isActive) cont.resumeWith(kotlin.Result.success(false))
         }
     }
 
