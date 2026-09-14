@@ -98,6 +98,10 @@ class ExportRepositoryImpl @Inject constructor(
                 }
 
                 val fileSize = outputFile.length()
+                val galleryUri = publishToGallery(outputFile, isImage)
+                if (galleryUri != null) {
+                    Timber.d("Export published to gallery: $galleryUri")
+                }
                 exportHistoryDao.insertExport(
                     ExportHistoryEntity(
                         projectId = projectId,
@@ -334,6 +338,30 @@ class ExportRepositoryImpl @Inject constructor(
             "monospace" -> "monospace"
             "cursive" -> "cursive"
             else -> "sans-serif"
+        }
+    }
+
+    private fun publishToGallery(outputFile: File, isImage: Boolean): android.net.Uri? {
+        return try {
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) return null
+            val collection = if (isImage) {
+                android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            } else {
+                android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            }
+            val values = android.content.ContentValues().apply {
+                put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, outputFile.name)
+                put(android.provider.MediaStore.MediaColumns.MIME_TYPE, if (isImage) "image/jpeg" else "video/mp4")
+                put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/WorldstarCut")
+            }
+            val uri = context.contentResolver.insert(collection, values) ?: return null
+            context.contentResolver.openOutputStream(uri)?.use { out ->
+                outputFile.inputStream().use { ins -> ins.copyTo(out) }
+            }
+            uri
+        } catch (e: Exception) {
+            Timber.e(e, "Gallery publish failed")
+            null
         }
     }
 
