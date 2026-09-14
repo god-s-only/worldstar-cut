@@ -146,10 +146,11 @@ class ExportRepositoryImpl @Inject constructor(
                     videoEffects.add(Crop(left, right, bottom, top))
                 }
 
-                // Overlays — text + sticker with timing + animationOut already baked via preview; for export we bake static position (effects TODO for animation)
+                // Overlays — timed + positioned per Media3 1.5 TextureOverlay API
+                // (getText/getBitmap per presentationTimeUs for windows, OverlaySettings anchors for position)
                 val overlays = mutableListOf<androidx.media3.effect.TextureOverlay>()
                 try {
-                    // Text overlays — render to bitmap then BitmapOverlay (position via OverlaySettings if available)
+                    // Text overlays
                     val textJson = clip.textOverlays
                     if (!textJson.isNullOrBlank()) {
                         val arr = org.json.JSONArray(textJson)
@@ -157,14 +158,38 @@ class ExportRepositoryImpl @Inject constructor(
                             val obj = arr.getJSONObject(i)
                             val txt = obj.optString("text", "")
                             if (txt.isBlank()) continue
-                            val startMs = obj.optLong("startMs", 0L)
-                            val durMs = obj.optLong("durationMs", 3000L)
+                            val startUs = obj.optLong("startMs", 0L) * 1000L
+                            val endUs = startUs + obj.optLong("durationMs", 3000L) * 1000L
+                            val posX = obj.optDouble("posX", 0.5).toFloat()
+                            val posY = obj.optDouble("posY", 0.5).toFloat()
                             val sizeSp = obj.optDouble("sizeSp", 24.0).toFloat()
+                            val rotation = obj.optDouble("rotation", 0.0).toFloat()
                             val color = obj.optInt("color", -1)
                             val fontFamily = obj.optString("fontFamily", "default")
                             try {
-                                val bmp = createTextBitmap(txt, sizeSp, color, fontFamily)
-                                if (bmp != null) overlays.add(androidx.media3.effect.BitmapOverlay.createStaticBitmapOverlay(bmp))
+                                val styled = android.text.SpannableString(txt).apply {
+                                    setSpan(
+                                        android.text.style.ForegroundColorSpan(color),
+                                        0, length,
+                                        android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                                    )
+                                    setSpan(
+                                        android.text.style.TypefaceSpan(mapExportFont(fontFamily)),
+                                        0, length,
+                                        android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                                    )
+                                }
+                                val blank = android.text.SpannableString(" ")
+                                val settings = overlaySettingsFor(posX, posY, sizeSp / 24f, rotation, 1f)
+                                overlays.add(object : androidx.media3.effect.TextOverlay() {
+                                    override fun getText(presentationTimeUs: Long): android.text.SpannableString {
+                                        return if (presentationTimeUs in startUs until endUs) styled else blank
+                                    }
+
+                                    override fun getOverlaySettings(presentationTimeUs: Long): androidx.media3.effect.OverlaySettings {
+                                        return settings
+                                    }
+                                })
                             } catch (_: Exception) {}
                         }
                     }
@@ -176,10 +201,13 @@ class ExportRepositoryImpl @Inject constructor(
                             val obj = arr2.getJSONObject(i)
                             val uriStr = obj.optString("imageUri", "")
                             if (uriStr.isBlank()) continue
-                            val startMs = obj.optLong("startMs", 0L)
-                            val durMs = obj.optLong("durationMs", 3000L)
+                            val startUs = obj.optLong("startMs", 0L) * 1000L
+                            val endUs = startUs + obj.optLong("durationMs", 3000L) * 1000L
                             val posX = obj.optDouble("posX", 0.5).toFloat()
                             val posY = obj.optDouble("posY", 0.5).toFloat()
+                            val sizeScale = obj.optDouble("sizeScale", 0.3).toFloat()
+                            val rotation = obj.optDouble("rotation", 0.0).toFloat()
+                            val opacity = obj.optDouble("opacity", 1.0).toFloat()
                             try {
                                 val bmp = when {
                                     uriStr.startsWith("file://") -> android.graphics.BitmapFactory.decodeFile(Uri.parse(uriStr).path)
@@ -188,9 +216,17 @@ class ExportRepositoryImpl @Inject constructor(
                                     else -> null
                                 }
                                 if (bmp != null) {
-                                    val bitmapOverlay = androidx.media3.effect.BitmapOverlay.createStaticBitmapOverlay(bmp)
-                                    // OverlaySettings would set timing/position if API supports — for now add as overlay
-                                    overlays.add(bitmapOverlay)
+                                    val hidden = android.graphics.Bitmap.createBitmap(1, 1, android.graphics.Bitmap.Config.ARGB_8888)
+                                    val settings = overlaySettingsFor(posX, posY, sizeScale, rotation, opacity)
+                                    overlays.add(object : androidx.media3.effect.BitmapOverlay() {
+                                        override fun getBitmap(presentationTimeUs: Long): android.graphics.Bitmap {
+                                            return if (presentationTimeUs in startUs until endUs) bmp else hidden
+                                        }
+
+                                        override fun getOverlaySettings(presentationTimeUs: Long): androidx.media3.effect.OverlaySettings {
+                                            return settings
+                                        }
+                                    })
                                 }
                             } catch (_: Exception) {}
                         }
@@ -272,29 +308,33 @@ class ExportRepositoryImpl @Inject constructor(
             onFailure = { Result.Error(Failure.LocalError("Cannot create output path", it)) }
         )
 
-    private fun createTextBitmap(text: String, sizeSp: Float, color: Int, fontFamily: String): android.graphics.Bitmap? {
-        return try {
-            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                this.color = color
-                this.textSize = sizeSp * 3f
-                typeface = when (fontFamily) {
-                    "serif" -> android.graphics.Typeface.SERIF
-                    "sans-serif" -> android.graphics.Typeface.SANS_SERIF
-                    "monospace" -> android.graphics.Typeface.MONOSPACE
-                    "cursive" -> android.graphics.Typeface.create("cursive", android.graphics.Typeface.NORMAL)
-                    else -> android.graphics.Typeface.DEFAULT
-                }
-                setShadowLayer(4f, 2f, 2f, android.graphics.Color.BLACK)
-            }
-            val bounds = android.graphics.Rect()
-            paint.getTextBounds(text, 0, text.length, bounds)
-            val w = (bounds.width() + 40).coerceAtLeast(100)
-            val h = (bounds.height() + 40).coerceAtLeast(60)
-            val bmp = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
-            val canvas = android.graphics.Canvas(bmp)
-            canvas.drawText(text, 20f, h / 2f + bounds.height() / 2f, paint)
-            bmp
-        } catch (_: Exception) { null }
+    private fun overlaySettingsFor(
+        posX: Float,
+        posY: Float,
+        scaleFactor: Float,
+        rotationDegreesCw: Float,
+        alpha: Float
+    ): androidx.media3.effect.OverlaySettings {
+        // Preview pos 0..1 (center 0.5) -> NDC -1..1 (center 0, y up)
+        val anchorX = ((posX - 0.5f) * 2f).coerceIn(-1f, 1f)
+        val anchorY = ((0.5f - posY) * 2f).coerceIn(-1f, 1f)
+        return androidx.media3.effect.OverlaySettings.Builder()
+            .setBackgroundFrameAnchor(anchorX, anchorY)
+            .setOverlayFrameAnchor(0f, 0f)
+            .setScale(scaleFactor.coerceIn(0.05f, 4f), scaleFactor.coerceIn(0.05f, 4f))
+            .setRotationDegrees(-rotationDegreesCw) // Media3 is CCW, preview rotationZ is CW
+            .setAlphaScale(alpha.coerceIn(0f, 1f))
+            .build()
+    }
+
+    private fun mapExportFont(fontFamily: String): String {
+        return when (fontFamily) {
+            "serif" -> "serif"
+            "sans-serif" -> "sans-serif"
+            "monospace" -> "monospace"
+            "cursive" -> "cursive"
+            else -> "sans-serif"
+        }
     }
 
     private fun getExportOutputPath(projectId: Long): String {
