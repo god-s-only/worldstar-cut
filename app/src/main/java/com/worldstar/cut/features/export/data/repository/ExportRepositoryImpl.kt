@@ -207,7 +207,7 @@ class ExportRepositoryImpl @Inject constructor(
             }
 
             if (editedItems.isEmpty()) {
-                cont.resumeWith(Result.success(false))
+                cont.resumeWith(kotlin.Result.success(false))
                 return@suspendCancellableCoroutine
             }
 
@@ -221,7 +221,7 @@ class ExportRepositoryImpl @Inject constructor(
                 .addListener(object : Transformer.Listener {
                     override fun onCompleted(composition: Composition, exportResult: ExportResult) {
                         Timber.d("Transformer completed: ${exportResult}")
-                        if (cont.isActive) cont.resumeWith(Result.success(true))
+                        if (cont.isActive) cont.resumeWith(kotlin.Result.success(true))
                     }
 
                     override fun onError(
@@ -231,7 +231,7 @@ class ExportRepositoryImpl @Inject constructor(
                     ) {
                         Timber.e(exportException, "Transformer error")
                         _exportState.value = ExportState.Failed(exportException.message ?: "Transformer error")
-                        if (cont.isActive) cont.resumeWith(Result.success(false))
+                        if (cont.isActive) cont.resumeWith(kotlin.Result.success(false))
                     }
                 })
                 .build()
@@ -249,7 +249,7 @@ class ExportRepositoryImpl @Inject constructor(
             }
         } catch (e: Exception) {
             Timber.e(e, "Transformer setup failed")
-            if (cont.isActive) cont.resume(false)
+            if (cont.isActive) cont.resumeWith(kotlin.Result.success(false))
         }
         }
     }
