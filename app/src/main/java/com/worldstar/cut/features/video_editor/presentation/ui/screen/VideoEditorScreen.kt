@@ -63,8 +63,10 @@ import com.worldstar.cut.features.video_editor.domain.model.Clip
 import com.worldstar.cut.features.video_editor.domain.model.ImageOverlay
 import com.worldstar.cut.features.video_editor.domain.model.MotionSegment
 import com.worldstar.cut.features.video_editor.domain.model.MotionTrackPath
+import com.worldstar.cut.features.video_editor.domain.model.OverlayAnimationFrame
 import com.worldstar.cut.features.video_editor.domain.model.TextOverlay
 import com.worldstar.cut.features.video_editor.domain.model.TrackedFrame
+import com.worldstar.cut.features.video_editor.domain.model.resolveOverlayAnimationFrame
 import com.worldstar.cut.features.video_editor.presentation.viewmodel.EditorTool
 import com.worldstar.cut.features.video_editor.presentation.viewmodel.VideoEditorEvent
 import com.worldstar.cut.features.video_editor.presentation.viewmodel.VideoEditorViewModel
@@ -2163,24 +2165,16 @@ private fun DraggableText(
         angle = rotation
     }
 
-    // CapCut-style animation — entrance + exit
-    val animDuration = 600L
-    val timeRemaining = durationMs - playbackMs
-    val isEntrance = isPlaying && playbackMs in 0..animDuration && animation != "none"
-    val isExit = isPlaying && timeRemaining in 0..animDuration && animationOut != "none" && playbackMs < durationMs
-    val animProgress = when {
-        isEntrance -> playbackMs.toFloat() / animDuration
-        isExit -> timeRemaining.toFloat() / animDuration
-        else -> 1f
+    // CapCut-style animation — entrance + exit (shared resolver, also used by export)
+    val animFrame = if (isPlaying) {
+        resolveOverlayAnimationFrame(animation, animationOut, playbackMs, durationMs)
+    } else {
+        OverlayAnimationFrame("none", 1f)
     }
-    val activeAnim = when {
-        isEntrance -> animation
-        isExit -> animationOut
-        else -> "none"
-    }
-    val activeProgress = if (isEntrance || isExit) animProgress else 1f
+    val activeAnim = animFrame.animation
+    val activeProgress = animFrame.progress
     val displayedText = when {
-        activeAnim == "typewriter" && (isEntrance || isExit) -> {
+        activeAnim == "typewriter" -> {
             val len = (text.length * activeProgress).toInt().coerceIn(0, text.length)
             if (len <= 0) " " else text.take(len)
         }
