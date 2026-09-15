@@ -14,9 +14,6 @@
     @com.google.gson.annotations.SerializedName <fields>;
 }
 
-# FFmpeg
--keep class com.arthenica.ffmpegkit.** { *; }
-
 # Media3
 -keep class androidx.media3.** { *; }
 
