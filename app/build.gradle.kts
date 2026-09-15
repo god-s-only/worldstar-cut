@@ -71,28 +71,6 @@ android {
         }
         jniLibs {
             useLegacyPackaging = true
-            pickFirsts += setOf(
-                "lib/arm64-v8a/libavcodec.so",
-                "lib/arm64-v8a/libavformat.so",
-                "lib/arm64-v8a/libavutil.so",
-                "lib/arm64-v8a/libswresample.so",
-                "lib/arm64-v8a/libswscale.so",
-                "lib/armeabi-v7a/libavcodec.so",
-                "lib/armeabi-v7a/libavformat.so",
-                "lib/armeabi-v7a/libavutil.so",
-                "lib/armeabi-v7a/libswresample.so",
-                "lib/armeabi-v7a/libswscale.so",
-                "lib/x86/libavcodec.so",
-                "lib/x86/libavformat.so",
-                "lib/x86/libavutil.so",
-                "lib/x86/libswresample.so",
-                "lib/x86/libswscale.so",
-                "lib/x86_64/libavcodec.so",
-                "lib/x86_64/libavformat.so",
-                "lib/x86_64/libavutil.so",
-                "lib/x86_64/libswresample.so",
-                "lib/x86_64/libswscale.so"
-            )
         }
     }
 }
@@ -151,9 +129,6 @@ dependencies {
     implementation(libs.timber)
     implementation(libs.lottie.compose)
     implementation(libs.segmentation.selfie)
-
-    // FFmpeg
-    implementation(libs.ffmpeg.kit.full)
 
     // Testing
     testImplementation(libs.junit)
