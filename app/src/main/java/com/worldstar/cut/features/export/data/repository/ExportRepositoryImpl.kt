@@ -23,6 +23,7 @@ import com.worldstar.cut.features.export.domain.model.ExportState
 import com.worldstar.cut.features.export.domain.repository.ExportRepository
 import com.worldstar.cut.features.video_editor.data.local.db.ClipDao
 import com.worldstar.cut.features.video_editor.data.local.db.TrackDao
+import com.worldstar.cut.features.video_editor.domain.model.resolveOverlayAnimationFrame
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -170,28 +171,31 @@ class ExportRepositoryImpl @Inject constructor(
                             val rotation = obj.optDouble("rotation", 0.0).toFloat()
                             val color = obj.optInt("color", -1)
                             val fontFamily = obj.optString("fontFamily", "default")
+                            val animIn = obj.optString("animation", "none")
+                            val animOut = obj.optString("animationOut", "none")
+                            val durMs = obj.optLong("durationMs", 3000L)
                             try {
-                                val styled = android.text.SpannableString(txt).apply {
-                                    setSpan(
-                                        android.text.style.ForegroundColorSpan(color),
-                                        0, length,
-                                        android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-                                    )
-                                    setSpan(
-                                        android.text.style.TypefaceSpan(mapExportFont(fontFamily)),
-                                        0, length,
-                                        android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-                                    )
-                                }
                                 val blank = android.text.SpannableString(" ")
-                                val settings = overlaySettingsFor(posX, posY, sizeSp / 24f, rotation, 1f)
+                                val anchorX = ((posX - 0.5f) * 2f).coerceIn(-1f, 1f)
+                                val anchorY = ((0.5f - posY) * 2f).coerceIn(-1f, 1f)
+                                val baseScale = (sizeSp / 24f).coerceIn(0.05f, 4f)
                                 overlays.add(object : androidx.media3.effect.TextOverlay() {
                                     override fun getText(presentationTimeUs: Long): android.text.SpannableString {
-                                        return if (presentationTimeUs in startUs until endUs) styled else blank
+                                        if (presentationTimeUs !in startUs until endUs) return blank
+                                        val localMs = (presentationTimeUs - startUs) / 1000L
+                                        val frame = resolveOverlayAnimationFrame(animIn, animOut, localMs, durMs)
+                                        if (frame.animation != "typewriter") {
+                                            return styledTextSlice(txt, txt.length, color, fontFamily)
+                                        }
+                                        val n = (txt.length * frame.progress).toInt().coerceIn(0, txt.length)
+                                        if (n <= 0) return blank
+                                        return styledTextSlice(txt, n, color, fontFamily)
                                     }
 
                                     override fun getOverlaySettings(presentationTimeUs: Long): androidx.media3.effect.OverlaySettings {
-                                        return settings
+                                        val localMs = (presentationTimeUs - startUs) / 1000L
+                                        val frame = resolveOverlayAnimationFrame(animIn, animOut, localMs, durMs)
+                                        return animatedOverlaySettings(anchorX, anchorY, baseScale, rotation, 1f, frame)
                                     }
                                 })
                             } catch (_: Exception) {}
@@ -212,6 +216,9 @@ class ExportRepositoryImpl @Inject constructor(
                             val sizeScale = obj.optDouble("sizeScale", 0.3).toFloat()
                             val rotation = obj.optDouble("rotation", 0.0).toFloat()
                             val opacity = obj.optDouble("opacity", 1.0).toFloat()
+                            val animIn = obj.optString("animation", "none")
+                            val animOut = obj.optString("animationOut", "none")
+                            val durMs = obj.optLong("durationMs", 3000L)
                             try {
                                 val bmp = when {
                                     uriStr.startsWith("file://") -> android.graphics.BitmapFactory.decodeFile(Uri.parse(uriStr).path)
@@ -221,14 +228,18 @@ class ExportRepositoryImpl @Inject constructor(
                                 }
                                 if (bmp != null) {
                                     val hidden = android.graphics.Bitmap.createBitmap(1, 1, android.graphics.Bitmap.Config.ARGB_8888)
-                                    val settings = overlaySettingsFor(posX, posY, sizeScale, rotation, opacity)
+                                    val anchorX = ((posX - 0.5f) * 2f).coerceIn(-1f, 1f)
+                                    val anchorY = ((0.5f - posY) * 2f).coerceIn(-1f, 1f)
+                                    val baseScale = sizeScale.coerceIn(0.05f, 4f)
                                     overlays.add(object : androidx.media3.effect.BitmapOverlay() {
                                         override fun getBitmap(presentationTimeUs: Long): android.graphics.Bitmap {
                                             return if (presentationTimeUs in startUs until endUs) bmp else hidden
                                         }
 
                                         override fun getOverlaySettings(presentationTimeUs: Long): androidx.media3.effect.OverlaySettings {
-                                            return settings
+                                            val localMs = (presentationTimeUs - startUs) / 1000L
+                                            val frame = resolveOverlayAnimationFrame(animIn, animOut, localMs, durMs)
+                                            return animatedOverlaySettings(anchorX, anchorY, baseScale, rotation, opacity, frame)
                                         }
                                     })
                                 }
@@ -312,23 +323,60 @@ class ExportRepositoryImpl @Inject constructor(
             onFailure = { Result.Error(Failure.LocalError("Cannot create output path", it)) }
         )
 
-    private fun overlaySettingsFor(
-        posX: Float,
-        posY: Float,
-        scaleFactor: Float,
+    /**
+     * Per-frame overlay settings mirroring the preview animation math
+     * ([DraggableText]/[DraggableImage]) in NDC units, driven by the shared
+     * [resolveOverlayAnimationFrame] so exports match the preview.
+     */
+    private fun animatedOverlaySettings(
+        anchorX: Float,
+        anchorY: Float,
+        baseScale: Float,
         rotationDegreesCw: Float,
-        alpha: Float
+        baseAlpha: Float,
+        frame: com.worldstar.cut.features.video_editor.domain.model.OverlayAnimationFrame
     ): androidx.media3.effect.OverlaySettings {
-        // Preview pos 0..1 (center 0.5) -> NDC -1..1 (center 0, y up)
-        val anchorX = ((posX - 0.5f) * 2f).coerceIn(-1f, 1f)
-        val anchorY = ((0.5f - posY) * 2f).coerceIn(-1f, 1f)
+        var ax = anchorX
+        var ay = anchorY
+        var s = baseScale
+        var a = baseAlpha
+        val p = frame.progress
+        when (frame.animation) {
+            "fade" -> a = baseAlpha * p
+            "slide_up" -> { ay = (anchorY - (1f - p) * 0.3f).coerceIn(-1f, 1f); a = baseAlpha * p }
+            "slide_down" -> { ay = (anchorY + (1f - p) * 0.3f).coerceIn(-1f, 1f); a = baseAlpha * p }
+            "slide_left" -> { ax = (anchorX + (1f - p) * 0.3f).coerceIn(-1f, 1f); a = baseAlpha * p }
+            "slide_right" -> { ax = (anchorX - (1f - p) * 0.3f).coerceIn(-1f, 1f); a = baseAlpha * p }
+            "scale" -> { s = baseScale * (0.3f + 0.7f * p); a = baseAlpha * p }
+            "glitch" -> {
+                ax = (anchorX + (kotlin.random.Random.nextFloat() - 0.5f) * 0.04f * (1f - p)).coerceIn(-1f, 1f)
+                a = baseAlpha * p
+            }
+            "wave" -> ay = (anchorY + kotlin.math.sin(p * Math.PI * 4).toFloat() * 0.025f).coerceIn(-1f, 1f)
+            else -> {}
+        }
         return androidx.media3.effect.OverlaySettings.Builder()
-            .setBackgroundFrameAnchor(anchorX, anchorY)
+            .setBackgroundFrameAnchor(ax, ay)
             .setOverlayFrameAnchor(0f, 0f)
-            .setScale(scaleFactor.coerceIn(0.05f, 4f), scaleFactor.coerceIn(0.05f, 4f))
+            .setScale(s.coerceIn(0.05f, 4f), s.coerceIn(0.05f, 4f))
             .setRotationDegrees(-rotationDegreesCw) // Media3 is CCW, preview rotationZ is CW
-            .setAlphaScale(alpha.coerceIn(0f, 1f))
+            .setAlphaScale(a.coerceIn(0f, 1f))
             .build()
+    }
+
+    private fun styledTextSlice(text: String, length: Int, color: Int, fontFamily: String): android.text.SpannableString {
+        return android.text.SpannableString(text.take(length)).apply {
+            setSpan(
+                android.text.style.ForegroundColorSpan(color),
+                0, this.length,
+                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+            setSpan(
+                android.text.style.TypefaceSpan(mapExportFont(fontFamily)),
+                0, this.length,
+                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+        }
     }
 
     private fun mapExportFont(fontFamily: String): String {
