@@ -2341,22 +2341,14 @@ private fun DraggableImage(
         angle = rotation
     }
 
-    // CapCut animation — entrance + exit for sticker
-    val animDuration = 600L
-    val timeRemaining = durationMs - playbackMs
-    val isEntrance = isPlaying && playbackMs in 0..animDuration && animation != "none"
-    val isExit = isPlaying && timeRemaining in 0..animDuration && animationOut != "none" && playbackMs < durationMs
-    val animProgress = when {
-        isEntrance -> playbackMs.toFloat() / animDuration
-        isExit -> timeRemaining.toFloat() / animDuration
-        else -> 1f
+    // CapCut animation — entrance + exit for sticker (shared resolver, also used by export)
+    val animFrame = if (isPlaying) {
+        resolveOverlayAnimationFrame(animation, animationOut, playbackMs, durationMs)
+    } else {
+        OverlayAnimationFrame("none", 1f)
     }
-    val activeAnim = when {
-        isEntrance -> animation
-        isExit -> animationOut
-        else -> "none"
-    }
-    val activeProgress = if (isEntrance || isExit) animProgress else 1f
+    val activeAnim = animFrame.animation
+    val activeProgress = animFrame.progress
     val glitchOffsetX = if (activeAnim == "glitch" && activeProgress < 1f) {
         (kotlin.random.Random.nextFloat() - 0.5f) * 16f * (1f - activeProgress)
     } else 0f
